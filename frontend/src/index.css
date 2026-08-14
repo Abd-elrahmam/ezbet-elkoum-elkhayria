@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  font-family: "Cairo", "Tahoma", sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #b0edcb;
+  border-radius: 999px;
+}
+
+.card {
+  @apply bg-white rounded-2xl shadow-sm border border-sand-100 p-5;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition active:scale-[0.98];
+}
+.btn-primary {
+  @apply btn bg-primary-600 text-white hover:bg-primary-700 shadow-sm;
+}
+.btn-secondary {
+  @apply btn bg-sand-100 text-sand-800 hover:bg-sand-200;
+}
+.btn-danger {
+  @apply btn bg-red-50 text-red-600 hover:bg-red-100;
+}
+.btn-ghost {
+  @apply btn text-sand-600 hover:bg-sand-50;
+}
+
+.input {
+  @apply w-full rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition;
+}
+.label {
+  @apply block text-sm font-medium text-sand-700 mb-1;
+}
+
+table.data-table {
+  @apply w-full text-sm border-collapse;
+}
+table.data-table th {
+  @apply text-right px-3 py-2 bg-sand-50 text-sand-600 font-semibold border-b border-sand-100 sticky top-0;
+}
+table.data-table td {
+  @apply px-3 py-2 border-b border-sand-100 text-sand-800;
+}
+table.data-table tr:hover td {
+  @apply bg-primary-50/40;
+}
+
+.badge {
+  @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold;
+}
