@@ -4,10 +4,14 @@ const cors = require("cors");
 const morgan = require("morgan");
 const path = require("path");
 const connectDB = require("./config/db");
+const runSeed = require("./utils/seed");
 
 const app = express();
 
-connectDB();
+connectDB().then(() => {
+  // تشغيل تلقائي: إنشاء الأدمن الرئيسي والفروع التجريبية لو مش موجودين بالفعل
+  runSeed().catch((err) => console.error("⚠️ فشل التهيئة التلقائية:", err.message));
+});
 
 app.use(cors({ origin: process.env.CLIENT_URL || "*", credentials: true }));
 app.use(express.json());
@@ -16,7 +20,7 @@ app.use(morgan("dev"));
 // تقديم الصور المرفوعة (الشعار وصور اللاندينج بيج) بشكل ثابت
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.get("/api/health", (req, res) => res.json({ status: "ok", name: "جمعية بلال بن رباح - API" }));
+app.get("/api/health", (req, res) => res.json({ status: "ok", name: "جمعية العلوم الخيرية بعزبة الكوم - API" }));
 
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/branches", require("./routes/branches"));
