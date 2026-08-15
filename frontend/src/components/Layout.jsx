@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { to: "/payments", label: "المدفوعات", icon: "💵", roles: ["super_admin", "branch_manager"] },
   { to: "/expenses", label: "المصروفات", icon: "🧾", roles: ["super_admin", "branch_manager"] },
   { to: "/salaries", label: "الرواتب", icon: "💰", roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/reports", label: "التقارير", icon: "🖨️", roles: ["super_admin", "branch_manager"] },
   { to: "/settings", label: "إعدادات الموقع", icon: "⚙️", roles: ["super_admin"] },
 ];
 
@@ -36,10 +37,10 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-sand-50" dir="rtl">
+    <div className="min-h-screen bg-sand-50 print:bg-white" dir="rtl">
       {/* الشريط الجانبي - ثابت في مكانه (fixed) بارتفاع الشاشة، وقائمة الروابط جواه بس هي اللي بتسكرول */}
       <aside
-        className={`fixed z-30 inset-y-0 right-0 w-64 h-screen bg-white border-l border-sand-100 flex flex-col transition-transform duration-200 ${
+        className={`print:hidden fixed z-30 inset-y-0 right-0 w-64 h-screen bg-white border-l border-sand-100 flex flex-col transition-transform duration-200 ${
           sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
         }`}
       >
@@ -98,28 +99,32 @@ const Layout = ({ children }) => {
       )}
 
       {/* المحتوى - بيبدأ بعد مساحة السايدبار الثابت، وبيسكرول مع الصفحة كلها بشكل طبيعي */}
-      <div className="lg:mr-64 min-h-screen flex flex-col">
-        <header className="lg:hidden bg-white border-b border-sand-100 p-4 flex items-center justify-between">
+      <div className="lg:mr-64 print:mr-0 min-h-screen flex flex-col">
+        <header className="print:hidden lg:hidden bg-white border-b border-sand-100 p-4 flex items-center justify-between">
           <button onClick={() => setSidebarOpen(true)} className="btn-ghost">
             ☰ القائمة
           </button>
           <div className="font-bold text-sand-800">{settings?.heroTitle || "جمعية العلوم الخيرية"}</div>
         </header>
 
-        <div className="bg-primary-600 text-white text-center text-xs sm:text-sm py-1.5">
+        <div className="print:hidden bg-primary-600 text-white text-center text-xs sm:text-sm py-1.5">
           {new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
         </div>
 
         {/* المحتوى الأساسي - بيسكرول طبيعي مع الصفحة، مش جواه هو */}
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="flex-1 p-4 lg:p-8 print:p-0">
           <div className="max-w-7xl w-full mx-auto">{children}</div>
         </main>
 
         {/* الفوتر جزء من تدفق الصفحة، بيظهر في آخرها بعد المحتوى */}
-        <Footer whatsappNumber={settings?.whatsappNumber} />
+        <div className="print:hidden">
+          <Footer whatsappNumber={settings?.whatsappNumber} />
+        </div>
       </div>
 
-      <FloatingWhatsApp whatsappNumber={settings?.whatsappNumber} />
+      <div className="print:hidden">
+        <FloatingWhatsApp whatsappNumber={settings?.whatsappNumber} />
+      </div>
     </div>
   );
 };

@@ -4,6 +4,10 @@ const Student = require("../models/Student");
 const User = require("../models/User");
 const Payment = require("../models/Payment");
 const Expense = require("../models/Expense");
+const Attendance = require("../models/Attendance");
+const Evaluation = require("../models/Evaluation");
+const Salary = require("../models/Salary");
+const LeaveRequest = require("../models/LeaveRequest");
 const { protect } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
 
@@ -51,7 +55,44 @@ router.get("/stats", async (req, res) => {
     quranCount,
     incomeThisMonth: incomeAgg[0]?.total || 0,
     expensesThisMonth: expenseAgg[0]?.total || 0,
+    performance: req.user.role === ROLES.SUPER_ADMIN ? await computePerformance(monthStart) : null,
   });
 });
+
+// مؤشرات أداء سريعة على مستوى الجمعية كلها (للأدمن الرئيسي فقط)
+const computePerformance = async (monthStart) => {
+  const [attendanceAgg, evaluationAgg, salaryAgg, leaveAgg] = await Promise.all([
+    Attendance.aggregate([
+      { $match: { date: { $gte: monthStart } } },
+      { $group: { _id: null, total: { $sum: 1 }, present: { $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } } } },
+    ]),
+    Evaluation.aggregate([
+      { $match: { date: { $gte: monthStart } } },
+      { $group: { _id: null, avgRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+    ]),
+    Salary.aggregate([
+      { $match: { month: `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}` } },
+      { $group: { _id: null, total: { $sum: 1 }, paid: { $sum: { $cond: ["$paid", 1, 0] } } } },
+    ]),
+    LeaveRequest.aggregate([
+      { $match: { createdAt: { $gte: monthStart }, status: { $ne: "pending" } } },
+      { $group: { _id: null, total: { $sum: 1 }, approved: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } } } },
+    ]),
+  ]);
+
+  const attendance = attendanceAgg[0];
+  const evaluation = evaluationAgg[0];
+  const salary = salaryAgg[0];
+  const leave = leaveAgg[0];
+
+  const pct = (num, denom) => (denom ? Math.round((num / denom) * 100) : null);
+
+  return {
+    attendanceRate: pct(attendance?.present, attendance?.total),
+    evaluationRate: evaluation?.avgRating ? Math.round((evaluation.avgRating / 5) * 100) : null,
+    salariesPaidRate: pct(salary?.paid, salary?.total),
+    leaveApprovalRate: pct(leave?.approved, leave?.total),
+  };
+};
 
 module.exports = router;

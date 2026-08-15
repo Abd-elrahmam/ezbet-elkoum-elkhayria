@@ -214,10 +214,12 @@ const Employees = () => {
               <label className="label">اسم المستخدم</label>
               <input className="input" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} disabled={!!editing} />
             </div>
-            <div>
-              <label className="label">{editing ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}</label>
-              <input className="input" type="password" required={!editing} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-            </div>
+            {(!editing || user.role === "super_admin") && (
+              <div>
+                <label className="label">{editing ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}</label>
+                <input className="input" type="password" required={!editing} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              </div>
+            )}
             <div>
               <label className="label">الهاتف</label>
               <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />

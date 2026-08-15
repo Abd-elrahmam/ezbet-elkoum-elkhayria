@@ -2,6 +2,7 @@ const express = require("express");
 const Attendance = require("../models/Attendance");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
+const { monthRange } = require("../utils/dateRange");
 
 const router = express.Router();
 router.use(protect);
@@ -21,6 +22,10 @@ router.get("/", async (req, res) => {
     const next = new Date(day);
     next.setDate(day.getDate() + 1);
     filter.date = { $gte: day, $lt: next };
+  }
+  if (req.query.month) {
+    const { start, end } = monthRange(req.query.month);
+    filter.date = { $gte: start, $lt: end };
   }
   const records = await Attendance.find(filter)
     .populate("student", "name")

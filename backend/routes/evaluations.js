@@ -2,6 +2,7 @@ const express = require("express");
 const Evaluation = require("../models/Evaluation");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
+const { monthRange } = require("../utils/dateRange");
 
 const router = express.Router();
 router.use(protect);
@@ -16,6 +17,10 @@ router.get("/", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) filter.teacher = req.user._id; // المدرس يشوف تقييماته بس
   if (req.query.student) filter.student = req.query.student;
   if (req.query.period) filter.period = req.query.period;
+  if (req.query.month) {
+    const { start, end } = monthRange(req.query.month);
+    filter.date = { $gte: start, $lt: end };
+  }
 
   const evaluations = await Evaluation.find(filter)
     .populate("student", "name")

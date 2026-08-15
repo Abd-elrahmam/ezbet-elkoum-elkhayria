@@ -18,6 +18,7 @@ import LeaveRequests from "./pages/LeaveRequests";
 import Payments from "./pages/Payments";
 import Expenses from "./pages/Expenses";
 import Salaries from "./pages/Salaries";
+import Reports from "./pages/Reports";
 import SiteSettings from "./pages/SiteSettings";
 
 const withLayout = (Component) => (
@@ -65,6 +66,10 @@ function App() {
         element={<ProtectedRoute roles={["super_admin", "branch_manager"]}>{withLayout(Expenses)}</ProtectedRoute>}
       />
       <Route path="/salaries" element={<ProtectedRoute>{withLayout(Salaries)}</ProtectedRoute>} />
+      <Route
+        path="/reports"
+        element={<ProtectedRoute roles={["super_admin", "branch_manager"]}>{withLayout(Reports)}</ProtectedRoute>}
+      />
       <Route
         path="/settings"
         element={<ProtectedRoute roles={["super_admin"]}>{withLayout(SiteSettings)}</ProtectedRoute>}

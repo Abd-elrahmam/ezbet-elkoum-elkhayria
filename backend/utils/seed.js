@@ -1,12 +1,8 @@
-require("dotenv").config();
-const connectDB = require("../config/db");
 const User = require("../models/User");
 const Branch = require("../models/Branch");
 const { ROLES } = require("./constants");
 
-const run = async () => {
-  await connectDB();
-
+const runSeed = async () => {
   const existingAdmin = await User.findOne({ role: ROLES.SUPER_ADMIN });
   if (existingAdmin) {
     console.log("⚠️  يوجد أدمن رئيسي بالفعل:", existingAdmin.username);
@@ -20,7 +16,6 @@ const run = async () => {
     });
     console.log("✅ تم إنشاء الأدمن الرئيسي:");
     console.log("   اسم المستخدم:", admin.username);
-    console.log("   كلمة المرور:", process.env.SUPER_ADMIN_PASSWORD || "Admin@12345");
   }
 
   const branchesCount = await Branch.countDocuments();
@@ -44,10 +39,19 @@ const run = async () => {
   }
 
   console.log("🎉 تمت التهيئة بنجاح");
-  process.exit(0);
 };
 
-run().catch((err) => {
-  console.error("❌ فشل التهيئة:", err);
-  process.exit(1);
-});
+// تشغيل مباشر عن طريق npm run seed (لسه شغالة برضو لو الكونسول اشتغل)
+if (require.main === module) {
+  require("dotenv").config();
+  const connectDB = require("../config/db");
+  connectDB()
+    .then(runSeed)
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error("❌ فشل التهيئة:", err);
+      process.exit(1);
+    });
+}
+
+module.exports = runSeed;

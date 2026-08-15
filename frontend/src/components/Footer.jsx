@@ -8,7 +8,7 @@ const WhatsAppIcon = () => (
 
 const Footer = ({ whatsappNumber = "201021330018", developerName = "عبدالرحمن فضل" }) => {
   return (
-    <footer className="border-t border-sand-100 bg-white/60 mt-10">
+    <footer className="border-t border-sand-100 bg-white/60 ">
       <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
         <p className="text-sand-500">
           © {new Date().getFullYear()} جمعية الكوم الخيرية بعزبة الكوم — جميع الحقوق محفوظة

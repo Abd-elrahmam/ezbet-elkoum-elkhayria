@@ -48,12 +48,40 @@ const Dashboard = () => {
         </div>
       )}
 
+      {user?.role === "super_admin" && stats?.performance && (
+        <div className="card">
+          <h2 className="font-bold text-sand-800 mb-4">📊 الأداء العام هذا الشهر</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+            <PerformanceBar label="نسبة الحضور" value={stats.performance.attendanceRate} />
+            <PerformanceBar label="متوسط تقييم الطلاب" value={stats.performance.evaluationRate} />
+            <PerformanceBar label="نسبة الرواتب المدفوعة" value={stats.performance.salariesPaidRate} />
+            <PerformanceBar label="نسبة قبول الإجازات" value={stats.performance.leaveApprovalRate} />
+          </div>
+        </div>
+      )}
+
       {/* <div className="card">
         <h2 className="font-bold text-sand-800 mb-2">تنقّل سريع</h2>
         <p className="text-sand-500 text-sm">
           استخدم القائمة الجانبية للوصول إلى الطلاب، الحضور والغياب، الاختبارات، تقييم الطلاب، طلبات الإجازة، والرواتب.
         </p>
       </div> */}
+    </div>
+  );
+};
+
+const PerformanceBar = ({ label, value }) => {
+  const hasValue = value !== null && value !== undefined;
+  const color = !hasValue ? "bg-sand-200" : value >= 75 ? "bg-primary-600" : value >= 50 ? "bg-amber-500" : "bg-red-500";
+  return (
+    <div>
+      <div className="flex items-center justify-between text-sm mb-1.5">
+        <span className="text-sand-600">{label}</span>
+        <span className="font-bold text-sand-900">{hasValue ? `${value}%` : "لا بيانات"}</span>
+      </div>
+      <div className="h-2.5 rounded-full bg-sand-100 overflow-hidden">
+        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${hasValue ? value : 0}%` }} />
+      </div>
     </div>
   );
 };

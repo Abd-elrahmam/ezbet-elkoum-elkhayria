@@ -16,6 +16,11 @@ const SiteSettings = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
   useEffect(() => {
     if (settings) {
       setForm({
@@ -58,6 +63,29 @@ const SiteSettings = () => {
       setError(err.response?.data?.message || "فشل رفع الصورة");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordMessage("");
+    setPasswordError("");
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError("كلمة المرور الجديدة وتأكيدها غير متطابقين");
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      await api.put("/auth/change-password", {
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordMessage("تم تغيير كلمة المرور بنجاح ✅");
+      setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      setPasswordError(err.response?.data?.message || "حدث خطأ");
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -118,6 +146,28 @@ const SiteSettings = () => {
           <p className="text-xs text-sand-400 mt-1">هو الرقم اللي يظهر لزوار الصفحة الرئيسية وزر التواصل العائم. أما توقيع المطور في تذييل الصفحات فرقمه ثابت ومش قابل للتعديل.</p>
         </div>
         <button className="btn-primary" disabled={saving}>{saving ? "جارِ الحفظ..." : "حفظ الإعدادات"}</button>
+      </form>
+
+      <form onSubmit={handleChangePassword} className="card mt-6 space-y-4">
+        <h2 className="font-bold text-sand-800">تغيير كلمة مرورك</h2>
+        <p className="text-xs text-sand-400 -mt-2">تغيير كلمة مرور الأدمن الرئيسي متاح من هنا فقط. لتغيير كلمة مرور موظف، عدّلها من صفحة "الموظفون".</p>
+        {passwordMessage && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2">{passwordMessage}</div>}
+        {passwordError && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{passwordError}</div>}
+        <div>
+          <label className="label">كلمة المرور الحالية</label>
+          <input className="input" type="password" required value={passwordForm.oldPassword} onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">كلمة المرور الجديدة</label>
+            <input className="input" type="password" required minLength={6} value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">تأكيد كلمة المرور الجديدة</label>
+            <input className="input" type="password" required minLength={6} value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} />
+          </div>
+        </div>
+        <button className="btn-primary" disabled={passwordSaving}>{passwordSaving ? "جارِ التغيير..." : "تغيير كلمة المرور"}</button>
       </form>
     </div>
   );

@@ -2,6 +2,7 @@ const express = require("express");
 const Test = require("../models/Test");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
+const { monthRange } = require("../utils/dateRange");
 
 const router = express.Router();
 router.use(protect);
@@ -17,6 +18,10 @@ router.get("/", async (req, res) => {
   if (req.query.student) filter.student = req.query.student;
   if (req.query.type) filter.type = req.query.type;
   if (req.user.role === ROLES.EMPLOYEE) filter.examiner = req.user._id;
+  if (req.query.month) {
+    const { start, end } = monthRange(req.query.month);
+    filter.date = { $gte: start, $lt: end };
+  }
 
   const tests = await Test.find(filter)
     .populate("student", "name")

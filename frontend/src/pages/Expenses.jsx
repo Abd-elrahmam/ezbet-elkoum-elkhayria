@@ -15,6 +15,7 @@ const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState(null);
   const [error, setError] = useState("");
@@ -27,7 +28,21 @@ const Expenses = () => {
   useEffect(load, []);
 
   const openCreate = () => {
+    setEditing(null);
     setForm(emptyForm);
+    setError("");
+    setModalOpen(true);
+  };
+
+  const openEdit = (exp) => {
+    setEditing(exp);
+    setForm({
+      category: exp.category,
+      amount: exp.amount,
+      department: exp.department,
+      date: exp.date?.slice(0, 10),
+      description: exp.description || "",
+    });
     setError("");
     setModalOpen(true);
   };
@@ -36,7 +51,11 @@ const Expenses = () => {
     e.preventDefault();
     setError("");
     try {
-      await api.post("/expenses", form);
+      if (editing) {
+        await api.put(`/expenses/${editing._id}`, form);
+      } else {
+        await api.post("/expenses", form);
+      }
       setModalOpen(false);
       load();
     } catch (err) {
@@ -84,7 +103,10 @@ const Expenses = () => {
                   <td>{e.date?.slice(0, 10)}</td>
                   <td className="text-sand-500">{e.description || "—"}</td>
                   <td>
-                    <button className="btn-ghost text-red-500" onClick={() => setDeleteId(e._id)}>حذف</button>
+                    <div className="flex gap-2">
+                      <button className="btn-ghost" onClick={() => openEdit(e)}>تعديل</button>
+                      <button className="btn-ghost text-red-500" onClick={() => setDeleteId(e._id)}>حذف</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -96,7 +118,7 @@ const Expenses = () => {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="تسجيل مصروف جديد">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "تعديل المصروف" : "تسجيل مصروف جديد"}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
           <div>
@@ -125,7 +147,7 @@ const Expenses = () => {
             <label className="label">الوصف</label>
             <textarea className="input" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
-          <button className="btn-primary w-full justify-center">تسجيل المصروف</button>
+          <button className="btn-primary w-full justify-center">{editing ? "حفظ التعديلات" : "تسجيل المصروف"}</button>
         </form>
       </Modal>
 

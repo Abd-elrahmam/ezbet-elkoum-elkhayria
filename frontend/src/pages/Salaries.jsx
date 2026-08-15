@@ -88,8 +88,8 @@ const Salaries = () => {
     }
   };
 
-  const togglePaid = async (s) => {
-    await api.put(`/salaries/${s._id}`, { paid: !s.paid, paidDate: !s.paid ? new Date() : null });
+  const changeStatus = async (s, paid) => {
+    await api.put(`/salaries/${s._id}`, { paid, paidDate: paid ? new Date() : null });
     load();
   };
 
@@ -141,12 +141,20 @@ const Salaries = () => {
                     <td className="text-red-600">-{s.deductions?.toLocaleString("ar-EG")}</td>
                     <td className="font-bold">{s.netSalary?.toLocaleString("ar-EG")} جنيه</td>
                     <td>
-                      <button
-                        onClick={() => canManage && !own && togglePaid(s)}
-                        className={`badge ${s.paid ? "bg-primary-50 text-primary-700" : "bg-amber-50 text-amber-600"} ${canManage && !own ? "cursor-pointer" : ""}`}
-                      >
-                        {s.paid ? "مدفوع" : "غير مدفوع"}
-                      </button>
+                      {canManage && !own ? (
+                        <select
+                          value={s.paid ? "paid" : "unpaid"}
+                          onChange={(e) => changeStatus(s, e.target.value === "paid")}
+                          className={`input !w-auto !py-1.5 !text-xs font-semibold ${s.paid ? "!text-primary-700 !border-primary-200" : "!text-amber-600 !border-amber-200"}`}
+                        >
+                          <option value="unpaid">غير مدفوع</option>
+                          <option value="paid">مدفوع</option>
+                        </select>
+                      ) : (
+                        <span className={`badge ${s.paid ? "bg-primary-50 text-primary-700" : "bg-amber-50 text-amber-600"}`}>
+                          {s.paid ? "مدفوع" : "غير مدفوع"}
+                        </span>
+                      )}
                     </td>
                     {canManage && (
                       <td>

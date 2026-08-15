@@ -10,7 +10,7 @@ const STATUS_COLORS = {
   rejected: "bg-red-50 text-red-600",
 };
 
-const emptyForm = { startDate: "", endDate: "", reason: "" };
+const emptyForm = { startDate: "", endDate: "", reason: "", status: "pending" };
 
 const LeaveRequests = () => {
   const { user } = useAuth();
@@ -18,6 +18,7 @@ const LeaveRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -32,7 +33,20 @@ const LeaveRequests = () => {
   useEffect(load, [filterStatus]);
 
   const openCreate = () => {
+    setEditing(null);
     setForm(emptyForm);
+    setError("");
+    setModalOpen(true);
+  };
+
+  const openEdit = (r) => {
+    setEditing(r);
+    setForm({
+      startDate: r.startDate?.slice(0, 10) || "",
+      endDate: r.endDate?.slice(0, 10) || "",
+      reason: r.reason || "",
+      status: r.status,
+    });
     setError("");
     setModalOpen(true);
   };
@@ -41,7 +55,11 @@ const LeaveRequests = () => {
     e.preventDefault();
     setError("");
     try {
-      await api.post("/leaves", form);
+      if (editing) {
+        await api.put(`/leaves/${editing._id}`, form);
+      } else {
+        await api.post("/leaves", form);
+      }
       setModalOpen(false);
       load();
     } catch (err) {
@@ -110,6 +128,9 @@ const LeaveRequests = () => {
                           <button className="btn-ghost text-red-500" onClick={() => review(r._id, "rejected")}>رفض</button>
                         </>
                       )}
+                      {(canReview || r.status === "pending") && (
+                        <button className="btn-ghost" onClick={() => openEdit(r)}>تعديل</button>
+                      )}
                       {(r.status === "pending" || canReview) && (
                         <button className="btn-ghost text-red-500" onClick={() => handleDelete(r._id)}>حذف</button>
                       )}
@@ -125,7 +146,7 @@ const LeaveRequests = () => {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="تقديم طلب إجازة">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "تعديل طلب الإجازة" : "تقديم طلب إجازة"}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
           <div className="grid grid-cols-2 gap-4">
@@ -142,7 +163,17 @@ const LeaveRequests = () => {
             <label className="label">سبب الإجازة</label>
             <textarea className="input" rows={3} required value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
           </div>
-          <button className="btn-primary w-full justify-center">تقديم الطلب</button>
+          {editing && canReview && (
+            <div>
+              <label className="label">الحالة</label>
+              <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <option value="pending">قيد المراجعة</option>
+                <option value="approved">مقبولة</option>
+                <option value="rejected">مرفوضة</option>
+              </select>
+            </div>
+          )}
+          <button className="btn-primary w-full justify-center">{editing ? "حفظ التعديلات" : "تقديم الطلب"}</button>
         </form>
       </Modal>
     </div>

@@ -17,6 +17,7 @@ html, body {
 ::-webkit-scrollbar-thumb {
   background-color: #b0edcb;
   border-radius: 999px;
+
 }
 
 .card {
