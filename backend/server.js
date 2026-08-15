@@ -20,7 +20,7 @@ app.use(morgan("dev"));
 // تقديم الصور المرفوعة (الشعار وصور اللاندينج بيج) بشكل ثابت
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.get("/api/health", (req, res) => res.json({ status: "ok", name: "جمعية العلوم الخيرية بعزبة الكوم - API" }));
+app.get("/api/health", (req, res) => res.json({ status: "ok", name: "جمعية الكوم الخيرية بعزبة الكوم - API" }));
 
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/branches", require("./routes/branches"));
