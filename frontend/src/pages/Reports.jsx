@@ -14,12 +14,23 @@ const monthLabel = (monthStr) => {
   return new Date(y, m - 1, 1).toLocaleDateString("ar-EG", { year: "numeric", month: "long" });
 };
 
+const getMonthBounds = (monthStr) => {
+  const [y, m] = monthStr.split("-").map(Number);
+  return { start: new Date(y, m - 1, 1), end: new Date(y, m, 1) };
+};
+
+const attendanceSummary = (records) => {
+  const summary = { present: 0, absent: 0, late: 0, excused: 0, total: records.length };
+  records.forEach((r) => { summary[r.status] = (summary[r.status] || 0) + 1; });
+  return summary;
+};
+
 const Reports = () => {
   const { user } = useAuth();
   const { settings } = useSettings();
   const logoSrc = settings?.logoUrl ? resolveMediaUrl(settings.logoUrl) : "/logo.jpg";
 
-  const [reportType, setReportType] = useState("student"); // student | employee
+  const [reportType, setReportType] = useState("student"); // student | employee | branch
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [students, setStudents] = useState([]);
@@ -29,7 +40,7 @@ const Reports = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [report, setReport] = useState(null); // { person, attendance, evaluations, tests, salary, leaves }
+  const [report, setReport] = useState(null);
 
   useEffect(() => {
     if (user.role === "super_admin") api.get("/branches").then((res) => setBranches(res.data));
@@ -40,7 +51,7 @@ const Reports = () => {
     setSelectedPerson("");
     setReport(null);
     const branchId = user.role === "super_admin" ? selectedBranch : user.branch?._id || user.branch;
-    if (!branchId) {
+    if (!branchId || reportType === "branch") {
       setStudents([]);
       setEmployees([]);
       return;
@@ -53,7 +64,11 @@ const Reports = () => {
   }, [reportType, selectedBranch]);
 
   const generateReport = async () => {
-    if (!selectedPerson || !month) return;
+    const branchId = user.role === "super_admin" ? selectedBranch : user.branch?._id || user.branch;
+    if (reportType !== "branch" && !selectedPerson) return;
+    if (reportType === "branch" && !branchId) return;
+    if (!month) return;
+
     setLoading(true);
     setError("");
     setReport(null);
@@ -72,17 +87,14 @@ const Reports = () => {
           evaluations: evaluationsRes.data,
           tests: testsRes.data,
         });
-      } else {
+      } else if (reportType === "employee") {
         const employee = employees.find((e) => e._id === selectedPerson);
         const [attendanceRes, salariesRes, leavesRes] = await Promise.all([
           api.get("/attendance", { params: { employee: selectedPerson, month } }),
           api.get("/salaries", { params: { employee: selectedPerson, month } }),
           api.get("/leaves", { params: { employee: selectedPerson } }),
         ]);
-        const { start, end } = (() => {
-          const [y, m] = month.split("-").map(Number);
-          return { start: new Date(y, m - 1, 1), end: new Date(y, m, 1) };
-        })();
+        const { start, end } = getMonthBounds(month);
         const leavesThisMonth = leavesRes.data.filter((l) => {
           const s = new Date(l.startDate);
           const e2 = new Date(l.endDate);
@@ -95,6 +107,72 @@ const Reports = () => {
           salary: salariesRes.data[0] || null,
           leaves: leavesThisMonth,
         });
+      } else {
+        // تقرير الفرع الشامل
+        const branch = branches.find((b) => b._id === branchId) || { name: user.branch?.name };
+        const { start, end } = getMonthBounds(month);
+
+        const [
+          studentsRes,
+          employeesRes,
+          attendanceRes,
+          paymentsRes,
+          expensesRes,
+          salariesRes,
+          evaluationsRes,
+          leavesRes,
+          competitionsRes,
+        ] = await Promise.all([
+          api.get("/students", { params: { branch: branchId } }),
+          api.get("/users", { params: { branch: branchId, role: "employee" } }),
+          api.get("/attendance", { params: { branch: branchId, month } }),
+          api.get("/payments", { params: { branch: branchId, month } }),
+          api.get("/expenses", { params: { branch: branchId, month } }),
+          api.get("/salaries", { params: { branch: branchId, month } }),
+          api.get("/evaluations", { params: { branch: branchId, month } }),
+          api.get("/leaves", { params: { branch: branchId } }),
+          api.get("/competitions", { params: { branch: branchId } }),
+        ]);
+
+        const studentAttendance = attendanceRes.data.filter((a) => a.student);
+        const employeeAttendance = attendanceRes.data.filter((a) => a.employee);
+
+        const totalIncome = paymentsRes.data.reduce((sum, p) => sum + p.amount, 0);
+        const totalExpenses = expensesRes.data.reduce((sum, e) => sum + e.amount, 0);
+
+        const leavesThisMonth = leavesRes.data.filter((l) => {
+          const s = new Date(l.startDate);
+          const e2 = new Date(l.endDate);
+          return s < end && e2 >= start;
+        });
+        const competitionsThisMonth = competitionsRes.data.filter((c) => {
+          const d = new Date(c.date);
+          return d >= start && d < end;
+        });
+
+        const avgRating = evaluationsRes.data.length
+          ? (evaluationsRes.data.reduce((sum, ev) => sum + ev.rating, 0) / evaluationsRes.data.length).toFixed(1)
+          : null;
+
+        setReport({
+          type: "branch",
+          branch,
+          studentsCount: studentsRes.data.length,
+          nurseryCount: studentsRes.data.filter((s) => s.department === "nursery").length,
+          quranCount: studentsRes.data.filter((s) => s.department === "quran").length,
+          employeesCount: employeesRes.data.length,
+          studentAttendance,
+          employeeAttendance,
+          totalIncome,
+          totalExpenses,
+          paymentsCount: paymentsRes.data.length,
+          expensesCount: expensesRes.data.length,
+          salaries: salariesRes.data,
+          avgRating,
+          evaluationsCount: evaluationsRes.data.length,
+          leaves: leavesThisMonth,
+          competitions: competitionsThisMonth,
+        });
       }
     } catch (err) {
       setError(err.response?.data?.message || "حدث خطأ أثناء تجهيز التقرير");
@@ -103,11 +181,7 @@ const Reports = () => {
     }
   };
 
-  const attendanceSummary = (records) => {
-    const summary = { present: 0, absent: 0, late: 0, excused: 0, total: records.length };
-    records.forEach((r) => { summary[r.status] = (summary[r.status] || 0) + 1; });
-    return summary;
-  };
+  const reportTitle = { student: "للطالب", employee: "للموظف", branch: "للفرع" }[reportType];
 
   return (
     <div>
@@ -122,6 +196,7 @@ const Reports = () => {
               <select className="input" value={reportType} onChange={(e) => setReportType(e.target.value)}>
                 <option value="student">تقرير طالب</option>
                 <option value="employee">تقرير موظف</option>
+                <option value="branch">تقرير فرع شامل</option>
               </select>
             </div>
             <div>
@@ -142,20 +217,26 @@ const Reports = () => {
                 </select>
               </div>
             )}
-            <div>
-              <label className="label">{reportType === "student" ? "الطالب" : "الموظف"}</label>
-              <select className="input" value={selectedPerson} onChange={(e) => setSelectedPerson(e.target.value)}>
-                <option value="">{reportType === "student" ? "اختر الطالب" : "اختر الموظف"}</option>
-                {(reportType === "student" ? students : employees).map((p) => (
-                  <option key={p._id} value={p._id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
+            {reportType !== "branch" && (
+              <div>
+                <label className="label">{reportType === "student" ? "الطالب" : "الموظف"}</label>
+                <select className="input" value={selectedPerson} onChange={(e) => setSelectedPerson(e.target.value)}>
+                  <option value="">{reportType === "student" ? "اختر الطالب" : "اختر الموظف"}</option>
+                  {(reportType === "student" ? students : employees).map((p) => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
 
-          <button className="btn-primary" disabled={!selectedPerson || loading} onClick={generateReport}>
+          <button
+            className="btn-primary"
+            disabled={(reportType !== "branch" && !selectedPerson) || loading}
+            onClick={generateReport}
+          >
             {loading ? "جارِ التجهيز..." : "إنشاء التقرير"}
           </button>
         </div>
@@ -174,116 +255,236 @@ const Reports = () => {
               <img src={logoSrc} alt="الشعار" className="w-16 h-16 rounded-full object-cover border border-sand-200" />
               <div>
                 <h2 className="text-xl font-bold text-sand-900">{settings?.heroTitle || "جمعية العلوم الخيرية بعزبة الكوم"}</h2>
-                <p className="text-sand-500 text-sm">تقرير شهري {report.type === "student" ? "للطالب" : "للموظف"} — {monthLabel(month)}</p>
+                <p className="text-sand-500 text-sm">تقرير شهري {reportTitle} — {monthLabel(month)}</p>
               </div>
             </div>
 
-            {/* بيانات الشخص */}
-            <div className="grid sm:grid-cols-2 gap-3 mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
-              <div><span className="text-sand-500 text-sm">الاسم: </span><span className="font-bold">{report.person?.name}</span></div>
-              {report.type === "student" ? (
-                <>
-                  <div><span className="text-sand-500 text-sm">القسم: </span><span className="font-bold">{report.person?.department === "nursery" ? "الحضانة" : "الكتاب"}</span></div>
-                  <div><span className="text-sand-500 text-sm">المدرس: </span><span className="font-bold">{report.person?.teacher?.name || "—"}</span></div>
-                  <div><span className="text-sand-500 text-sm">ولي الأمر: </span><span className="font-bold">{report.person?.guardianName || "—"}</span></div>
-                </>
-              ) : (
-                <>
-                  <div><span className="text-sand-500 text-sm">الوظيفة: </span><span className="font-bold">{report.person?.jobTitle || "—"}</span></div>
-                  <div><span className="text-sand-500 text-sm">القسم: </span><span className="font-bold">{report.person?.department === "nursery" ? "الحضانة" : report.person?.department === "quran" ? "الكتاب" : "الاثنين"}</span></div>
-                </>
-              )}
-            </div>
-
-            {/* ملخص الحضور */}
-            <ReportSection title="الحضور والغياب">
-              {(() => {
-                const s = attendanceSummary(report.attendance);
-                return (
-                  <div className="grid grid-cols-4 gap-3 mb-3">
-                    <MiniStat label="حاضر" value={s.present} color="text-primary-700" />
-                    <MiniStat label="غائب" value={s.absent} color="text-red-600" />
-                    <MiniStat label="متأخر" value={s.late} color="text-amber-600" />
-                    <MiniStat label="مُعتذر" value={s.excused} color="text-sand-500" />
-                  </div>
-                );
-              })()}
-              {report.attendance.length > 0 ? (
-                <PrintTable
-                  headers={["التاريخ", "الحالة"]}
-                  rows={report.attendance.map((a) => [a.date?.slice(0, 10), STATUS_LABELS[a.status]])}
-                />
-              ) : (
-                <EmptyNote text="لا توجد سجلات حضور هذا الشهر" />
-              )}
-            </ReportSection>
-
-            {report.type === "student" && (
+            {report.type !== "branch" ? (
               <>
-                <ReportSection title="التقييمات">
-                  {report.evaluations.length > 0 ? (
+                {/* بيانات الشخص */}
+                <div className="grid sm:grid-cols-2 gap-3 mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
+                  <div><span className="text-sand-500 text-sm">الاسم: </span><span className="font-bold">{report.person?.name}</span></div>
+                  {report.type === "student" ? (
+                    <>
+                      <div><span className="text-sand-500 text-sm">القسم: </span><span className="font-bold">{report.person?.department === "nursery" ? "الحضانة" : "الكتاب"}</span></div>
+                      <div><span className="text-sand-500 text-sm">المدرس: </span><span className="font-bold">{report.person?.teacher?.name || "—"}</span></div>
+                      <div><span className="text-sand-500 text-sm">ولي الأمر: </span><span className="font-bold">{report.person?.guardianName || "—"}</span></div>
+                    </>
+                  ) : (
+                    <>
+                      <div><span className="text-sand-500 text-sm">الوظيفة: </span><span className="font-bold">{report.person?.jobTitle || "—"}</span></div>
+                      <div><span className="text-sand-500 text-sm">القسم: </span><span className="font-bold">{report.person?.department === "nursery" ? "الحضانة" : report.person?.department === "quran" ? "الكتاب" : "الاثنين"}</span></div>
+                    </>
+                  )}
+                </div>
+
+                {/* ملخص الحضور */}
+                <ReportSection title="الحضور والغياب">
+                  {(() => {
+                    const s = attendanceSummary(report.attendance);
+                    return (
+                      <div className="grid grid-cols-4 gap-3 mb-3">
+                        <MiniStat label="حاضر" value={s.present} color="text-primary-700" />
+                        <MiniStat label="غائب" value={s.absent} color="text-red-600" />
+                        <MiniStat label="متأخر" value={s.late} color="text-amber-600" />
+                        <MiniStat label="مُعتذر" value={s.excused} color="text-sand-500" />
+                      </div>
+                    );
+                  })()}
+                  {report.attendance.length > 0 ? (
                     <PrintTable
-                      headers={["التاريخ", "الفترة", "التقييم العام", "الحفظ", "السلوك", "المشاركة", "ملاحظات"]}
-                      rows={report.evaluations.map((ev) => [
-                        ev.date?.slice(0, 10),
-                        PERIOD_LABELS[ev.period],
-                        `${ev.rating}/5`,
-                        ev.memorization ? `${ev.memorization}/5` : "—",
-                        ev.behavior ? `${ev.behavior}/5` : "—",
-                        ev.participation ? `${ev.participation}/5` : "—",
-                        ev.notes || "—",
-                      ])}
+                      headers={["التاريخ", "الحالة"]}
+                      rows={report.attendance.map((a) => [a.date?.slice(0, 10), STATUS_LABELS[a.status]])}
                     />
                   ) : (
-                    <EmptyNote text="لا توجد تقييمات هذا الشهر" />
+                    <EmptyNote text="لا توجد سجلات حضور هذا الشهر" />
                   )}
                 </ReportSection>
 
-                <ReportSection title="الاختبارات (التسميع)">
-                  {report.tests.length > 0 ? (
-                    <PrintTable
-                      headers={["التاريخ", "النوع", "العنوان", "الدرجة"]}
-                      rows={report.tests.map((t) => [t.date?.slice(0, 10), t.type === "weekly" ? "أسبوعي" : "شهري", t.title, `${t.score}/${t.maxScore}`])}
-                    />
-                  ) : (
-                    <EmptyNote text="لا توجد نتائج اختبارات هذا الشهر" />
-                  )}
-                </ReportSection>
+                {report.type === "student" && (
+                  <>
+                    <ReportSection title="التقييمات">
+                      {report.evaluations.length > 0 ? (
+                        <PrintTable
+                          headers={["التاريخ", "الفترة", "التقييم العام", "الحفظ", "السلوك", "المشاركة", "ملاحظات"]}
+                          rows={report.evaluations.map((ev) => [
+                            ev.date?.slice(0, 10),
+                            PERIOD_LABELS[ev.period],
+                            `${ev.rating}/5`,
+                            ev.memorization ? `${ev.memorization}/5` : "—",
+                            ev.behavior ? `${ev.behavior}/5` : "—",
+                            ev.participation ? `${ev.participation}/5` : "—",
+                            ev.notes || "—",
+                          ])}
+                        />
+                      ) : (
+                        <EmptyNote text="لا توجد تقييمات هذا الشهر" />
+                      )}
+                    </ReportSection>
+
+                    <ReportSection title="الاختبارات (التسميع)">
+                      {report.tests.length > 0 ? (
+                        <PrintTable
+                          headers={["التاريخ", "النوع", "العنوان", "الدرجة"]}
+                          rows={report.tests.map((t) => [t.date?.slice(0, 10), t.type === "weekly" ? "أسبوعي" : "شهري", t.title, `${t.score}/${t.maxScore}`])}
+                        />
+                      ) : (
+                        <EmptyNote text="لا توجد نتائج اختبارات هذا الشهر" />
+                      )}
+                    </ReportSection>
+                  </>
+                )}
+
+                {report.type === "employee" && (
+                  <>
+                    <ReportSection title="الراتب">
+                      {report.salary ? (
+                        <PrintTable
+                          headers={["الأساسي", "المكافآت", "الخصومات", "الصافي", "الحالة"]}
+                          rows={[[
+                            `${report.salary.baseSalary} جنيه`,
+                            `${report.salary.bonuses} جنيه`,
+                            `${report.salary.deductions} جنيه`,
+                            `${report.salary.netSalary} جنيه`,
+                            report.salary.paid ? "مدفوع" : "غير مدفوع",
+                          ]]}
+                        />
+                      ) : (
+                        <EmptyNote text="لا يوجد راتب مسجل لهذا الشهر" />
+                      )}
+                    </ReportSection>
+
+                    <ReportSection title="الإجازات">
+                      {report.leaves.length > 0 ? (
+                        <PrintTable
+                          headers={["من", "إلى", "السبب", "الحالة"]}
+                          rows={report.leaves.map((l) => [
+                            l.startDate?.slice(0, 10),
+                            l.endDate?.slice(0, 10),
+                            l.reason,
+                            l.status === "approved" ? "مقبولة" : l.status === "rejected" ? "مرفوضة" : "قيد المراجعة",
+                          ])}
+                        />
+                      ) : (
+                        <EmptyNote text="لا توجد إجازات هذا الشهر" />
+                      )}
+                    </ReportSection>
+                  </>
+                )}
               </>
-            )}
-
-            {report.type === "employee" && (
+            ) : (
               <>
-                <ReportSection title="الراتب">
-                  {report.salary ? (
-                    <PrintTable
-                      headers={["الأساسي", "المكافآت", "الخصومات", "الصافي", "الحالة"]}
-                      rows={[[
-                        `${report.salary.baseSalary} جنيه`,
-                        `${report.salary.bonuses} جنيه`,
-                        `${report.salary.deductions} جنيه`,
-                        `${report.salary.netSalary} جنيه`,
-                        report.salary.paid ? "مدفوع" : "غير مدفوع",
-                      ]]}
-                    />
+                {/* بيانات الفرع */}
+                <div className="mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
+                  <span className="text-sand-500 text-sm">الفرع: </span>
+                  <span className="font-bold text-lg">{report.branch?.name}</span>
+                </div>
+
+                {/* نظرة عامة */}
+                <ReportSection title="نظرة عامة">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <MiniStat label="إجمالي الطلاب" value={report.studentsCount} color="text-primary-700" />
+                    <MiniStat label="طلاب الحضانة" value={report.nurseryCount} color="text-primary-700" />
+                    <MiniStat label="طلاب الكتاب" value={report.quranCount} color="text-sand-700" />
+                    <MiniStat label="عدد الموظفين" value={report.employeesCount} color="text-sand-700" />
+                  </div>
+                </ReportSection>
+
+                {/* الحضور */}
+                <ReportSection title="ملخص حضور الطلاب">
+                  {(() => {
+                    const s = attendanceSummary(report.studentAttendance);
+                    return (
+                      <div className="grid grid-cols-4 gap-3">
+                        <MiniStat label="حاضر" value={s.present} color="text-primary-700" />
+                        <MiniStat label="غائب" value={s.absent} color="text-red-600" />
+                        <MiniStat label="متأخر" value={s.late} color="text-amber-600" />
+                        <MiniStat label="مُعتذر" value={s.excused} color="text-sand-500" />
+                      </div>
+                    );
+                  })()}
+                </ReportSection>
+
+                <ReportSection title="ملخص حضور الموظفين">
+                  {(() => {
+                    const s = attendanceSummary(report.employeeAttendance);
+                    return (
+                      <div className="grid grid-cols-4 gap-3">
+                        <MiniStat label="حاضر" value={s.present} color="text-primary-700" />
+                        <MiniStat label="غائب" value={s.absent} color="text-red-600" />
+                        <MiniStat label="متأخر" value={s.late} color="text-amber-600" />
+                        <MiniStat label="مُعتذر" value={s.excused} color="text-sand-500" />
+                      </div>
+                    );
+                  })()}
+                </ReportSection>
+
+                {/* المالية */}
+                <ReportSection title="الملخص المالي">
+                  <PrintTable
+                    headers={["البند", "القيمة"]}
+                    rows={[
+                      ["إجمالي الإيرادات (المدفوعات)", `${report.totalIncome.toLocaleString("ar-EG")} جنيه (${report.paymentsCount} دفعة)`],
+                      ["إجمالي المصروفات", `${report.totalExpenses.toLocaleString("ar-EG")} جنيه (${report.expensesCount} مصروف)`],
+                      ["صافي الفرع هذا الشهر", `${(report.totalIncome - report.totalExpenses).toLocaleString("ar-EG")} جنيه`],
+                    ]}
+                  />
+                </ReportSection>
+
+                {/* الرواتب */}
+                <ReportSection title="الرواتب">
+                  {report.salaries.length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        <MiniStat label="عدد الرواتب المسجلة" value={report.salaries.length} color="text-sand-700" />
+                        <MiniStat label="مدفوعة" value={report.salaries.filter((s) => s.paid).length} color="text-primary-700" />
+                        <MiniStat label="غير مدفوعة" value={report.salaries.filter((s) => !s.paid).length} color="text-red-600" />
+                      </div>
+                      <PrintTable
+                        headers={["الموظف", "الصافي", "الحالة"]}
+                        rows={report.salaries.map((s) => [s.employee?.name, `${s.netSalary} جنيه`, s.paid ? "مدفوع" : "غير مدفوع"])}
+                      />
+                    </>
                   ) : (
-                    <EmptyNote text="لا يوجد راتب مسجل لهذا الشهر" />
+                    <EmptyNote text="لا توجد رواتب مسجلة هذا الشهر" />
                   )}
                 </ReportSection>
 
-                <ReportSection title="الإجازات">
+                {/* التقييمات */}
+                <ReportSection title="تقييمات الطلاب">
+                  {report.evaluationsCount > 0 ? (
+                    <p className="text-sand-700">تم تسجيل <strong>{report.evaluationsCount}</strong> تقييم بمتوسط عام <strong>{report.avgRating} / 5</strong></p>
+                  ) : (
+                    <EmptyNote text="لا توجد تقييمات مسجلة هذا الشهر" />
+                  )}
+                </ReportSection>
+
+                {/* الإجازات */}
+                <ReportSection title="طلبات الإجازة">
                   {report.leaves.length > 0 ? (
                     <PrintTable
-                      headers={["من", "إلى", "السبب", "الحالة"]}
+                      headers={["الموظف", "من", "إلى", "الحالة"]}
                       rows={report.leaves.map((l) => [
+                        l.employee?.name,
                         l.startDate?.slice(0, 10),
                         l.endDate?.slice(0, 10),
-                        l.reason,
                         l.status === "approved" ? "مقبولة" : l.status === "rejected" ? "مرفوضة" : "قيد المراجعة",
                       ])}
                     />
                   ) : (
                     <EmptyNote text="لا توجد إجازات هذا الشهر" />
+                  )}
+                </ReportSection>
+
+                {/* المسابقات */}
+                <ReportSection title="مسابقات الموظفين">
+                  {report.competitions.length > 0 ? (
+                    <PrintTable
+                      headers={["العنوان", "التاريخ", "الفائز"]}
+                      rows={report.competitions.map((c) => [c.title, c.date?.slice(0, 10), c.winner?.name || "—"])}
+                    />
+                  ) : (
+                    <EmptyNote text="لا توجد مسابقات هذا الشهر" />
                   )}
                 </ReportSection>
               </>
@@ -314,7 +515,7 @@ const MiniStat = ({ label, value, color }) => (
 );
 
 const PrintTable = ({ headers, rows }) => (
-  <table className="w-full text-sm border-collapse">
+  <table className="w-full text-sm border-collapse mb-2">
     <thead>
       <tr>
         {headers.map((h) => (

@@ -2,6 +2,7 @@ const express = require("express");
 const Expense = require("../models/Expense");
 const { protect, scopeToOwnBranch, allowRoles } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
+const { monthRange } = require("../utils/dateRange");
 
 const router = express.Router();
 router.use(protect);
@@ -14,6 +15,10 @@ router.get("/", allowRoles(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER), async (req,
     filter.branch = req.user.branch;
   }
   if (req.query.category) filter.category = req.query.category;
+  if (req.query.month) {
+    const { start, end } = monthRange(req.query.month);
+    filter.date = { $gte: start, $lt: end };
+  }
   const expenses = await Expense.find(filter).populate("branch", "name").sort({ date: -1 });
   res.json(expenses);
 });
