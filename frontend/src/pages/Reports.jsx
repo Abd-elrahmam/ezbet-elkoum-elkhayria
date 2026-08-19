@@ -6,7 +6,13 @@ import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
 const PERIOD_LABELS = { daily: "يومي", weekly: "أسبوعي", monthly: "شهري" };
-const STATUS_LABELS = { present: "حاضر", absent: "غائب", late: "متأخر", excused: "مُعتذر" };
+const GRADE_LABELS = {
+  excellent: "ممتاز",
+  very_good: "جيد جدًا",
+  good: "جيد",
+  acceptable: "مقبول",
+  weak: "ضعيف",
+};
 
 const monthLabel = (monthStr) => {
   if (!monthStr) return "";
@@ -19,10 +25,20 @@ const getMonthBounds = (monthStr) => {
   return { start: new Date(y, m - 1, 1), end: new Date(y, m, 1) };
 };
 
-const attendanceSummary = (records) => {
-  const summary = { present: 0, absent: 0, late: 0, excused: 0, total: records.length };
-  records.forEach((r) => { summary[r.status] = (summary[r.status] || 0) + 1; });
+const sumAttendance = (records) => {
+  const summary = { present: 0, absent: 0, late: 0, excused: 0 };
+  records.forEach((r) => {
+    summary.present += r.presentDays || 0;
+    summary.absent += r.absentDays || 0;
+    summary.late += r.lateDays || 0;
+    summary.excused += r.excusedDays || 0;
+  });
   return summary;
+};
+
+const memRange = (r) => {
+  if (!r.memFromSurah && !r.memToSurah) return null;
+  return `من ${r.memFromSurah || "—"}${r.memFromAyah ? ` (آية ${r.memFromAyah})` : ""} إلى ${r.memToSurah || "—"}${r.memToAyah ? ` (آية ${r.memToAyah})` : ""}`;
 };
 
 const Reports = () => {
@@ -30,7 +46,7 @@ const Reports = () => {
   const { settings } = useSettings();
   const logoSrc = settings?.logoUrl ? resolveMediaUrl(settings.logoUrl) : "/logo.jpg";
 
-  const [reportType, setReportType] = useState("student"); // student | employee | branch
+  const [reportType, setReportType] = useState("student");
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [students, setStudents] = useState([]);
@@ -46,7 +62,6 @@ const Reports = () => {
     if (user.role === "super_admin") api.get("/branches").then((res) => setBranches(res.data));
   }, []);
 
-  // تحميل قائمة الطلاب/الموظفين حسب الفرع المختار (أو فرع المستخدم لو مدير فرع)
   useEffect(() => {
     setSelectedPerson("");
     setReport(null);
@@ -75,24 +90,27 @@ const Reports = () => {
     try {
       if (reportType === "student") {
         const student = students.find((s) => s._id === selectedPerson);
-        const [attendanceRes, evaluationsRes, testsRes] = await Promise.all([
-          api.get("/attendance", { params: { student: selectedPerson, month } }),
+        const [attendanceRes, evaluationsRes, testsRes, hifzRes] = await Promise.all([
+          api.get("/monthly-attendance", { params: { student: selectedPerson, month } }),
           api.get("/evaluations", { params: { student: selectedPerson, month } }),
           api.get("/tests", { params: { student: selectedPerson, month } }),
+          api.get("/hifz", { params: { student: selectedPerson, month } }),
         ]);
         setReport({
           type: "student",
           person: student,
-          attendance: attendanceRes.data,
+          attendance: sumAttendance(attendanceRes.data),
           evaluations: evaluationsRes.data,
           tests: testsRes.data,
+          hifz: hifzRes.data[0] || null,
         });
       } else if (reportType === "employee") {
         const employee = employees.find((e) => e._id === selectedPerson);
-        const [attendanceRes, salariesRes, leavesRes] = await Promise.all([
-          api.get("/attendance", { params: { employee: selectedPerson, month } }),
+        const [attendanceRes, salariesRes, leavesRes, hifzRes] = await Promise.all([
+          api.get("/monthly-attendance", { params: { employee: selectedPerson, month } }),
           api.get("/salaries", { params: { employee: selectedPerson, month } }),
           api.get("/leaves", { params: { employee: selectedPerson } }),
+          api.get("/hifz", { params: { employee: selectedPerson, month } }),
         ]);
         const { start, end } = getMonthBounds(month);
         const leavesThisMonth = leavesRes.data.filter((l) => {
@@ -103,12 +121,12 @@ const Reports = () => {
         setReport({
           type: "employee",
           person: employee,
-          attendance: attendanceRes.data,
+          attendance: sumAttendance(attendanceRes.data),
           salary: salariesRes.data[0] || null,
           leaves: leavesThisMonth,
+          hifz: hifzRes.data[0] || null,
         });
       } else {
-        // تقرير الفرع الشامل
         const branch = branches.find((b) => b._id === branchId) || { name: user.branch?.name };
         const { start, end } = getMonthBounds(month);
 
@@ -122,20 +140,22 @@ const Reports = () => {
           evaluationsRes,
           leavesRes,
           competitionsRes,
+          hifzRes,
         ] = await Promise.all([
           api.get("/students", { params: { branch: branchId } }),
           api.get("/users", { params: { branch: branchId, role: "employee" } }),
-          api.get("/attendance", { params: { branch: branchId, month } }),
+          api.get("/monthly-attendance", { params: { branch: branchId, month } }),
           api.get("/payments", { params: { branch: branchId, month } }),
           api.get("/expenses", { params: { branch: branchId, month } }),
           api.get("/salaries", { params: { branch: branchId, month } }),
           api.get("/evaluations", { params: { branch: branchId, month } }),
           api.get("/leaves", { params: { branch: branchId } }),
           api.get("/competitions", { params: { branch: branchId } }),
+          api.get("/hifz", { params: { branch: branchId, month } }),
         ]);
 
-        const studentAttendance = attendanceRes.data.filter((a) => a.student);
-        const employeeAttendance = attendanceRes.data.filter((a) => a.employee);
+        const studentAttendance = sumAttendance(attendanceRes.data.filter((a) => a.student));
+        const employeeAttendance = sumAttendance(attendanceRes.data.filter((a) => a.employee));
 
         const totalIncome = paymentsRes.data.reduce((sum, p) => sum + p.amount, 0);
         const totalExpenses = expensesRes.data.reduce((sum, e) => sum + e.amount, 0);
@@ -172,6 +192,7 @@ const Reports = () => {
           evaluationsCount: evaluationsRes.data.length,
           leaves: leavesThisMonth,
           competitions: competitionsThisMonth,
+          hifzCount: hifzRes.data.length,
         });
       }
     } catch (err) {
@@ -185,7 +206,6 @@ const Reports = () => {
 
   return (
     <div>
-      {/* شاشة الاختيار - تختفي عند الطباعة */}
       <div className="print:hidden">
         <h1 className="text-2xl font-bold text-sand-900 mb-6">التقارير الشهرية</h1>
 
@@ -242,7 +262,6 @@ const Reports = () => {
         </div>
       </div>
 
-      {/* التقرير نفسه - ده اللي بيتطبع */}
       {report && (
         <div className="print:block">
           <div className="flex justify-end mb-4 print:hidden">
@@ -250,7 +269,6 @@ const Reports = () => {
           </div>
 
           <div className="card print:shadow-none print:border-none print:p-0">
-            {/* هيدر التقرير */}
             <div className="flex items-center gap-4 border-b-2 border-primary-600 pb-4 mb-6">
               <img src={logoSrc} alt="الشعار" className="w-16 h-16 rounded-full object-cover border border-sand-200" />
               <div>
@@ -261,7 +279,6 @@ const Reports = () => {
 
             {report.type !== "branch" ? (
               <>
-                {/* بيانات الشخص */}
                 <div className="grid sm:grid-cols-2 gap-3 mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
                   <div><span className="text-sand-500 text-sm">الاسم: </span><span className="font-bold">{report.person?.name}</span></div>
                   {report.type === "student" ? (
@@ -278,26 +295,35 @@ const Reports = () => {
                   )}
                 </div>
 
-                {/* ملخص الحضور */}
                 <ReportSection title="الحضور والغياب">
-                  {(() => {
-                    const s = attendanceSummary(report.attendance);
-                    return (
-                      <div className="grid grid-cols-4 gap-3 mb-3">
-                        <MiniStat label="حاضر" value={s.present} color="text-primary-700" />
-                        <MiniStat label="غائب" value={s.absent} color="text-red-600" />
-                        <MiniStat label="متأخر" value={s.late} color="text-amber-600" />
-                        <MiniStat label="مُعتذر" value={s.excused} color="text-sand-500" />
+                  <div className="grid grid-cols-4 gap-3">
+                    <MiniStat label="حاضر" value={report.attendance.present} color="text-primary-700" />
+                    <MiniStat label="غائب" value={report.attendance.absent} color="text-red-600" />
+                    <MiniStat label="متأخر" value={report.attendance.late} color="text-amber-600" />
+                    <MiniStat label="مُعتذر" value={report.attendance.excused} color="text-sand-500" />
+                  </div>
+                </ReportSection>
+
+                <ReportSection title="الحفظ الشهري">
+                  {report.hifz ? (
+                    <div className="space-y-2 text-sm">
+                      {memRange(report.hifz) && (
+                        <p><span className="text-sand-500">الحفظ الجديد: </span><span className="font-semibold">{memRange(report.hifz)}</span></p>
+                      )}
+                      {(report.hifz.mutoonFrom || report.hifz.mutoonTo) && (
+                        <p><span className="text-sand-500">المتون: </span><span className="font-semibold">من {report.hifz.mutoonFrom || "—"} إلى {report.hifz.mutoonTo || "—"}</span></p>
+                      )}
+                      {(report.hifz.revisionFrom || report.hifz.revisionTo) && (
+                        <p><span className="text-sand-500">المراجعة: </span><span className="font-semibold">من {report.hifz.revisionFrom || "—"} إلى {report.hifz.revisionTo || "—"}</span></p>
+                      )}
+                      <div className="flex gap-4 pt-1">
+                        {report.hifz.grade && <span className="badge bg-primary-50 text-primary-700">التقييم: {GRADE_LABELS[report.hifz.grade]}</span>}
+                        {report.hifz.newPagesCount != null && <span className="badge bg-sand-100 text-sand-700">{report.hifz.newPagesCount} صفحة جديدة</span>}
                       </div>
-                    );
-                  })()}
-                  {report.attendance.length > 0 ? (
-                    <PrintTable
-                      headers={["التاريخ", "الحالة"]}
-                      rows={report.attendance.map((a) => [a.date?.slice(0, 10), STATUS_LABELS[a.status]])}
-                    />
+                      {report.hifz.notes && <p className="text-sand-500 pt-1">ملاحظات: {report.hifz.notes}</p>}
+                    </div>
                   ) : (
-                    <EmptyNote text="لا توجد سجلات حضور هذا الشهر" />
+                    <EmptyNote text="لا يوجد سجل حفظ لهذا الشهر" />
                   )}
                 </ReportSection>
 
@@ -374,13 +400,11 @@ const Reports = () => {
               </>
             ) : (
               <>
-                {/* بيانات الفرع */}
                 <div className="mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
                   <span className="text-sand-500 text-sm">الفرع: </span>
                   <span className="font-bold text-lg">{report.branch?.name}</span>
                 </div>
 
-                {/* نظرة عامة */}
                 <ReportSection title="نظرة عامة">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <MiniStat label="إجمالي الطلاب" value={report.studentsCount} color="text-primary-700" />
@@ -390,36 +414,24 @@ const Reports = () => {
                   </div>
                 </ReportSection>
 
-                {/* الحضور */}
                 <ReportSection title="ملخص حضور الطلاب">
-                  {(() => {
-                    const s = attendanceSummary(report.studentAttendance);
-                    return (
-                      <div className="grid grid-cols-4 gap-3">
-                        <MiniStat label="حاضر" value={s.present} color="text-primary-700" />
-                        <MiniStat label="غائب" value={s.absent} color="text-red-600" />
-                        <MiniStat label="متأخر" value={s.late} color="text-amber-600" />
-                        <MiniStat label="مُعتذر" value={s.excused} color="text-sand-500" />
-                      </div>
-                    );
-                  })()}
+                  <div className="grid grid-cols-4 gap-3">
+                    <MiniStat label="حاضر" value={report.studentAttendance.present} color="text-primary-700" />
+                    <MiniStat label="غائب" value={report.studentAttendance.absent} color="text-red-600" />
+                    <MiniStat label="متأخر" value={report.studentAttendance.late} color="text-amber-600" />
+                    <MiniStat label="مُعتذر" value={report.studentAttendance.excused} color="text-sand-500" />
+                  </div>
                 </ReportSection>
 
                 <ReportSection title="ملخص حضور الموظفين">
-                  {(() => {
-                    const s = attendanceSummary(report.employeeAttendance);
-                    return (
-                      <div className="grid grid-cols-4 gap-3">
-                        <MiniStat label="حاضر" value={s.present} color="text-primary-700" />
-                        <MiniStat label="غائب" value={s.absent} color="text-red-600" />
-                        <MiniStat label="متأخر" value={s.late} color="text-amber-600" />
-                        <MiniStat label="مُعتذر" value={s.excused} color="text-sand-500" />
-                      </div>
-                    );
-                  })()}
+                  <div className="grid grid-cols-4 gap-3">
+                    <MiniStat label="حاضر" value={report.employeeAttendance.present} color="text-primary-700" />
+                    <MiniStat label="غائب" value={report.employeeAttendance.absent} color="text-red-600" />
+                    <MiniStat label="متأخر" value={report.employeeAttendance.late} color="text-amber-600" />
+                    <MiniStat label="مُعتذر" value={report.employeeAttendance.excused} color="text-sand-500" />
+                  </div>
                 </ReportSection>
 
-                {/* المالية */}
                 <ReportSection title="الملخص المالي">
                   <PrintTable
                     headers={["البند", "القيمة"]}
@@ -431,7 +443,6 @@ const Reports = () => {
                   />
                 </ReportSection>
 
-                {/* الرواتب */}
                 <ReportSection title="الرواتب">
                   {report.salaries.length > 0 ? (
                     <>
@@ -450,16 +461,14 @@ const Reports = () => {
                   )}
                 </ReportSection>
 
-                {/* التقييمات */}
-                <ReportSection title="تقييمات الطلاب">
-                  {report.evaluationsCount > 0 ? (
-                    <p className="text-sand-700">تم تسجيل <strong>{report.evaluationsCount}</strong> تقييم بمتوسط عام <strong>{report.avgRating} / 5</strong></p>
-                  ) : (
-                    <EmptyNote text="لا توجد تقييمات مسجلة هذا الشهر" />
-                  )}
+                <ReportSection title="تقييمات الطلاب والحفظ الشهري">
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniStat label="عدد التقييمات" value={report.evaluationsCount} color="text-sand-700" />
+                    <MiniStat label="عدد سجلات الحفظ" value={report.hifzCount} color="text-sand-700" />
+                  </div>
+                  {report.avgRating && <p className="text-sand-700 mt-2">متوسط تقييم الطلاب: <strong>{report.avgRating} / 5</strong></p>}
                 </ReportSection>
 
-                {/* الإجازات */}
                 <ReportSection title="طلبات الإجازة">
                   {report.leaves.length > 0 ? (
                     <PrintTable
@@ -476,7 +485,6 @@ const Reports = () => {
                   )}
                 </ReportSection>
 
-                {/* المسابقات */}
                 <ReportSection title="مسابقات الموظفين">
                   {report.competitions.length > 0 ? (
                     <PrintTable

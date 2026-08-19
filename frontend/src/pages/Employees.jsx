@@ -1,11 +1,10 @@
-
 import React, { useEffect, useState } from "react";
 import api from "../api/axios";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth, ROLE_LABELS } from "../context/AuthContext";
 import { resolveMediaUrl } from "../context/SettingsContext";
- 
+
 const emptyForm = {
   name: "",
   username: "",
@@ -17,7 +16,7 @@ const emptyForm = {
   jobTitle: "",
   baseSalary: "",
 };
- 
+
 const Employees = () => {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
@@ -31,17 +30,17 @@ const Employees = () => {
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [savingPhoto, setSavingPhoto] = useState(false);
- 
+
   const load = () => {
     setLoading(true);
     api.get("/users").then((res) => setUsers(res.data)).finally(() => setLoading(false));
   };
- 
+
   useEffect(load, []);
   useEffect(() => {
     if (user.role === "super_admin") api.get("/branches").then((res) => setBranches(res.data));
   }, []);
- 
+
   const openCreate = () => {
     setEditing(null);
     setForm({ ...emptyForm, branch: user.role !== "super_admin" ? user.branch?._id || user.branch : "" });
@@ -50,7 +49,7 @@ const Employees = () => {
     setError("");
     setModalOpen(true);
   };
- 
+
   const openEdit = (u) => {
     setEditing(u);
     setForm({
@@ -69,14 +68,14 @@ const Employees = () => {
     setError("");
     setModalOpen(true);
   };
- 
+
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   };
- 
+
   const handleRemovePhoto = async () => {
     if (editing) {
       setSavingPhoto(true);
@@ -90,12 +89,12 @@ const Employees = () => {
     setPhotoFile(null);
     setPhotoPreview("");
   };
- 
+
   const toggleActive = async (u, active) => {
     await api.put(`/users/${u._id}`, { active });
     load();
   };
- 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -120,19 +119,19 @@ const Employees = () => {
       setError(err.response?.data?.message || "حدث خطأ");
     }
   };
- 
+
   const handleDelete = async () => {
     await api.delete(`/users/${deleteId}`);
     load();
   };
- 
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-sand-900">الموظفون ومديرو الفروع</h1>
         <button className="btn-primary" onClick={openCreate}>+ إضافة</button>
       </div>
- 
+
       <div className="card overflow-x-auto">
         {loading ? (
           <p className="text-sand-500 p-4">جارِ التحميل...</p>
@@ -202,7 +201,7 @@ const Employees = () => {
           </table>
         )}
       </div>
- 
+
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "تعديل بيانات الموظف" : "إضافة موظف / مدير"} wide>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
@@ -282,11 +281,10 @@ const Employees = () => {
           <button className="btn-primary w-full justify-center">{editing ? "حفظ التعديلات" : "إضافة"}</button>
         </form>
       </Modal>
- 
+
       <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} message="سيتم حذف المستخدم نهائيًا. هل أنت متأكد؟" />
     </div>
   );
 };
- 
+
 export default Employees;
- 

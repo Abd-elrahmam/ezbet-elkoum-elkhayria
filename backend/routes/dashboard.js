@@ -4,7 +4,7 @@ const Student = require("../models/Student");
 const User = require("../models/User");
 const Payment = require("../models/Payment");
 const Expense = require("../models/Expense");
-const Attendance = require("../models/Attendance");
+const Attendance = require("../models/MonthlyAttendance");
 const Evaluation = require("../models/Evaluation");
 const Salary = require("../models/Salary");
 const LeaveRequest = require("../models/LeaveRequest");
@@ -61,17 +61,18 @@ router.get("/stats", async (req, res) => {
 
 // مؤشرات أداء سريعة على مستوى الجمعية كلها (للأدمن الرئيسي فقط)
 const computePerformance = async (monthStart) => {
+  const monthStr = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}`;
   const [attendanceAgg, evaluationAgg, salaryAgg, leaveAgg] = await Promise.all([
     Attendance.aggregate([
-      { $match: { date: { $gte: monthStart } } },
-      { $group: { _id: null, total: { $sum: 1 }, present: { $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } } } },
+      { $match: { month: monthStr } },
+      { $group: { _id: null, present: { $sum: "$presentDays" }, absent: { $sum: "$absentDays" } } },
     ]),
     Evaluation.aggregate([
       { $match: { date: { $gte: monthStart } } },
       { $group: { _id: null, avgRating: { $avg: "$rating" }, count: { $sum: 1 } } },
     ]),
     Salary.aggregate([
-      { $match: { month: `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}` } },
+      { $match: { month: monthStr } },
       { $group: { _id: null, total: { $sum: 1 }, paid: { $sum: { $cond: ["$paid", 1, 0] } } } },
     ]),
     LeaveRequest.aggregate([
@@ -88,7 +89,7 @@ const computePerformance = async (monthStart) => {
   const pct = (num, denom) => (denom ? Math.round((num / denom) * 100) : null);
 
   return {
-    attendanceRate: pct(attendance?.present, attendance?.total),
+    attendanceRate: pct(attendance?.present, (attendance?.present || 0) + (attendance?.absent || 0)),
     evaluationRate: evaluation?.avgRating ? Math.round((evaluation.avgRating / 5) * 100) : null,
     salariesPaidRate: pct(salary?.paid, salary?.total),
     leaveApprovalRate: pct(leave?.approved, leave?.total),

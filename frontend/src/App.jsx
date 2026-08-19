@@ -13,6 +13,7 @@ import Employees from "./pages/Employees";
 import Attendance from "./pages/Attendance";
 import Tests from "./pages/Tests";
 import Evaluations from "./pages/Evaluations";
+import Hifz from "./pages/Hifz";
 import Competitions from "./pages/Competitions";
 import LeaveRequests from "./pages/LeaveRequests";
 import Payments from "./pages/Payments";
@@ -52,6 +53,7 @@ function App() {
       <Route path="/attendance" element={<ProtectedRoute>{withLayout(Attendance)}</ProtectedRoute>} />
       <Route path="/tests" element={<ProtectedRoute>{withLayout(Tests)}</ProtectedRoute>} />
       <Route path="/evaluations" element={<ProtectedRoute>{withLayout(Evaluations)}</ProtectedRoute>} />
+      <Route path="/hifz" element={<ProtectedRoute>{withLayout(Hifz)}</ProtectedRoute>} />
       <Route
         path="/competitions"
         element={<ProtectedRoute roles={["super_admin", "branch_manager"]}>{withLayout(Competitions)}</ProtectedRoute>}
