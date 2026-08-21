@@ -1,5 +1,6 @@
 const express = require("express");
 const MonthlyAttendance = require("../models/MonthlyAttendance");
+const Student = require("../models/Student");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
 
@@ -17,7 +18,13 @@ router.get("/", async (req, res) => {
   if (req.query.student) filter.student = req.query.student;
   if (req.query.employee) filter.employee = req.query.employee;
   if (req.query.month) filter.month = req.query.month;
-  if (req.user.role === ROLES.EMPLOYEE) filter.employee = req.user._id; // الموظف يشوف سجل حضوره هو بس
+
+  if (req.user.role === ROLES.EMPLOYEE) {
+    // الموظف يشوف: سجلاته الشخصية + سجلات طلابه المتوزعين عليه
+    const myStudents = await Student.find({ teacher: req.user._id }).select("_id");
+    const myStudentIds = myStudents.map((s) => s._id);
+    filter.$or = [{ employee: req.user._id }, { student: { $in: myStudentIds } }];
+  }
 
   const records = await MonthlyAttendance.find(filter)
     .populate("student", "name")
@@ -27,14 +34,21 @@ router.get("/", async (req, res) => {
   res.json(records);
 });
 
+// إضافة سجل حضور: الأدمن ومدير الفرع لأي طالب، والموظف لطلابه هو بس
 router.post("/", scopeToOwnBranch, async (req, res) => {
   try {
-    if (req.user.role === ROLES.EMPLOYEE) {
-      return res.status(403).json({ message: "ليس لديك صلاحية تسجيل الحضور" });
-    }
     const { student, employee, month } = req.body;
     if (!student && !employee) {
       return res.status(400).json({ message: "لازم تحدد طالب أو موظف" });
+    }
+    if (req.user.role === ROLES.EMPLOYEE) {
+      if (!student) {
+        return res.status(403).json({ message: "لا يمكنك تسجيل حضورك أنت، فقط حضور طلابك" });
+      }
+      const targetStudent = await Student.findById(student).select("teacher");
+      if (targetStudent?.teacher?.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: "لا يمكنك تسجيل حضور لطالب غير متوزع عليك" });
+      }
     }
     const existing = await MonthlyAttendance.findOne(student ? { student, month } : { employee, month });
     if (existing) {
@@ -50,9 +64,10 @@ router.post("/", scopeToOwnBranch, async (req, res) => {
   }
 });
 
+// تعديل/حذف: الأدمن ومدير الفرع فقط (الموظف يقدر يضيف بس، مش يعدل أو يحذف)
 router.put("/:id", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) {
-    return res.status(403).json({ message: "ليس لديك صلاحية تعديل الحضور" });
+    return res.status(403).json({ message: "ليس لديك صلاحية تعديل الحضور، تواصل مع مدير الفرع" });
   }
   const record = await MonthlyAttendance.findById(req.params.id);
   if (!record) return res.status(404).json({ message: "السجل غير موجود" });
@@ -66,7 +81,7 @@ router.put("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) {
-    return res.status(403).json({ message: "ليس لديك صلاحية حذف الحضور" });
+    return res.status(403).json({ message: "ليس لديك صلاحية حذف الحضور، تواصل مع مدير الفرع" });
   }
   const record = await MonthlyAttendance.findById(req.params.id);
   if (!record) return res.status(404).json({ message: "السجل غير موجود" });

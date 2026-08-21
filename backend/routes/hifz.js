@@ -1,6 +1,7 @@
 const express = require("express");
 const Hifz = require("../models/Hifz");
 const Student = require("../models/Student");
+const MonthlyAttendance = require("../models/MonthlyAttendance");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
 
@@ -16,6 +17,12 @@ const isOwnedByEmployee = async (record, employeeId) => {
     if (student?.teacher?.toString() === employeeId.toString()) return true;
   }
   return false;
+};
+
+// يجيب عدد أيام الحضور المسجلة لنفس الطالب/الموظف ونفس الشهر (تلقائيًا من سجل الحضور الشهري)
+const getAttendedDays = async (student, employee, month) => {
+  const record = await MonthlyAttendance.findOne(student ? { student, month } : { employee, month });
+  return record?.presentDays || 0;
 };
 
 router.get("/", async (req, res) => {
@@ -61,7 +68,8 @@ router.post("/", scopeToOwnBranch, async (req, res) => {
     if (existing) {
       return res.status(400).json({ message: "يوجد سجل حفظ بالفعل لنفس الشهر، عدّل السجل الموجود بدل إضافة سجل جديد" });
     }
-    const record = await Hifz.create({ ...req.body, recordedBy: req.user._id });
+    const attendedDays = await getAttendedDays(student, employee, month);
+    const record = await Hifz.create({ ...req.body, attendedDays, recordedBy: req.user._id });
     res.status(201).json(record);
   } catch (err) {
     res.status(400).json({ message: "فشل تسجيل الحفظ", error: err.message });
@@ -78,6 +86,8 @@ router.put("/:id", async (req, res) => {
     return res.status(403).json({ message: "لا يمكنك تعديل هذا السجل" });
   }
   Object.assign(record, req.body);
+  // إعادة حساب أيام الحضور من سجل الحضور الحالي (تحديث تلقائي)
+  record.attendedDays = await getAttendedDays(record.student, record.employee, record.month);
   await record.save();
   res.json(record);
 });

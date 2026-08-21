@@ -10,33 +10,51 @@ const hifzSchema = new mongoose.Schema(
     department: { type: String, enum: Object.values(DEPARTMENTS), required: true },
     month: { type: String, required: true }, // "2026-08"
 
-    // الحفظ الجديد
+    // ==== الحفظ الجديد ====
+    // مقدار الحفظ اليومي بالصفحات (نص صفحة = 0.5، سطر ~ 0.067 ... إلخ)
+    dailyMemPages: { type: Number, default: 0 },
     memFromSurah: { type: String, trim: true, default: "" },
     memFromAyah: { type: Number, default: null },
     memToSurah: { type: String, trim: true, default: "" },
     memToAyah: { type: Number, default: null },
 
+    // ==== المراجعة ====
+    dailyRevisionPages: { type: Number, default: 0 },
+    revFromSurah: { type: String, trim: true, default: "" },
+    revFromAyah: { type: Number, default: null },
+    revToSurah: { type: String, trim: true, default: "" },
+    revToAyah: { type: Number, default: null },
+
     // المتون (نص حر لأنها مش موحّدة زي سور القرآن)
     mutoonFrom: { type: String, trim: true, default: "" },
     mutoonTo: { type: String, trim: true, default: "" },
 
-    // المراجعة
-    revisionFrom: { type: String, trim: true, default: "" },
-    revisionTo: { type: String, trim: true, default: "" },
+    // عدد أيام الحضور المستخدمة في حساب الحفظ/المراجعة (نسخة وقت الحفظ، عشان التقرير يفضل صحيح حتى لو الحضور اتعدل بعدين)
+    attendedDays: { type: Number, default: 0 },
 
-    // إضافات مفيدة
+    // النتائج المحسوبة تلقائيًا (بالصفحات)
+    totalMemPages: { type: Number, default: 0 },
+    totalRevisionPages: { type: Number, default: 0 },
+
     grade: {
       type: String,
       enum: ["excellent", "very_good", "good", "acceptable", "weak", ""],
       default: "",
     },
-    newPagesCount: { type: Number, default: null },
 
     notes: { type: String, trim: true, default: "" },
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );
+
+// يحسب إجمالي الحفظ والمراجعة تلقائيًا (أيام الحضور × المقدار اليومي)
+hifzSchema.pre("save", function (next) {
+  const days = this.attendedDays || 0;
+  this.totalMemPages = Math.round((days * (this.dailyMemPages || 0)) * 100) / 100;
+  this.totalRevisionPages = Math.round((days * (this.dailyRevisionPages || 0)) * 100) / 100;
+  next();
+});
 
 hifzSchema.index({ student: 1, month: 1 });
 hifzSchema.index({ employee: 1, month: 1 });

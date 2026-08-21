@@ -38,6 +38,7 @@ app.use("/api/leaves", require("./routes/leaves"));
 app.use("/api/evaluations", require("./routes/evaluations"));
 app.use("/api/hifz", require("./routes/hifz"));
 app.use("/api/monthly-attendance", require("./routes/monthlyAttendance"));
+app.use("/api/employee-attendance", require("./routes/employeeAttendance"));
 
 // معالجة الأخطاء العامة
 app.use((err, req, res, next) => {

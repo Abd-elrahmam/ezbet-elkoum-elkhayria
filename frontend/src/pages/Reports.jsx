@@ -36,6 +36,19 @@ const sumAttendance = (records) => {
   return summary;
 };
 
+// يحول أرقام الحضور المجمّعة (لمجموعة أشخاص) لنسب مئوية، عشان الجمع الخام يكون مضلل
+const attendanceRates = (summary) => {
+  const total = summary.present + summary.absent + summary.late + summary.excused;
+  const pct = (n) => (total ? Math.round((n / total) * 100) : 0);
+  return {
+    presentRate: pct(summary.present),
+    absentRate: pct(summary.absent),
+    lateRate: pct(summary.late),
+    excusedRate: pct(summary.excused),
+    total,
+  };
+};
+
 const memRange = (r) => {
   if (!r.memFromSurah && !r.memToSurah) return null;
   return `من ${r.memFromSurah || "—"}${r.memFromAyah ? ` (آية ${r.memFromAyah})` : ""} إلى ${r.memToSurah || "—"}${r.memToAyah ? ` (آية ${r.memToAyah})` : ""}`;
@@ -107,7 +120,7 @@ const Reports = () => {
       } else if (reportType === "employee") {
         const employee = employees.find((e) => e._id === selectedPerson);
         const [attendanceRes, salariesRes, leavesRes, hifzRes] = await Promise.all([
-          api.get("/monthly-attendance", { params: { employee: selectedPerson, month } }),
+          api.get("/employee-attendance", { params: { employee: selectedPerson, month } }),
           api.get("/salaries", { params: { employee: selectedPerson, month } }),
           api.get("/leaves", { params: { employee: selectedPerson } }),
           api.get("/hifz", { params: { employee: selectedPerson, month } }),
@@ -118,10 +131,12 @@ const Reports = () => {
           const e2 = new Date(l.endDate);
           return s < end && e2 >= start;
         });
+        const dailySummary = { present: 0, absent: 0, late: 0, excused: 0 };
+        attendanceRes.data.forEach((r) => { if (dailySummary[r.status] !== undefined) dailySummary[r.status] += 1; });
         setReport({
           type: "employee",
           person: employee,
-          attendance: sumAttendance(attendanceRes.data),
+          attendance: dailySummary,
           salary: salariesRes.data[0] || null,
           leaves: leavesThisMonth,
           hifz: hifzRes.data[0] || null,
@@ -134,6 +149,7 @@ const Reports = () => {
           studentsRes,
           employeesRes,
           attendanceRes,
+          employeeAttendanceRes,
           paymentsRes,
           expensesRes,
           salariesRes,
@@ -145,6 +161,7 @@ const Reports = () => {
           api.get("/students", { params: { branch: branchId } }),
           api.get("/users", { params: { branch: branchId, role: "employee" } }),
           api.get("/monthly-attendance", { params: { branch: branchId, month } }),
+          api.get("/employee-attendance", { params: { branch: branchId, month } }),
           api.get("/payments", { params: { branch: branchId, month } }),
           api.get("/expenses", { params: { branch: branchId, month } }),
           api.get("/salaries", { params: { branch: branchId, month } }),
@@ -155,7 +172,11 @@ const Reports = () => {
         ]);
 
         const studentAttendance = sumAttendance(attendanceRes.data.filter((a) => a.student));
-        const employeeAttendance = sumAttendance(attendanceRes.data.filter((a) => a.employee));
+        // حضور الموظفين بقى يومي: كل سجل = يوم واحد بحالة واحدة، فبنعد التكرارات
+        const employeeAttendance = { present: 0, absent: 0, late: 0, excused: 0 };
+        employeeAttendanceRes.data.forEach((r) => {
+          if (employeeAttendance[r.status] !== undefined) employeeAttendance[r.status] += 1;
+        });
 
         const totalIncome = paymentsRes.data.reduce((sum, p) => sum + p.amount, 0);
         const totalExpenses = expensesRes.data.reduce((sum, e) => sum + e.amount, 0);
@@ -415,21 +436,31 @@ const Reports = () => {
                 </ReportSection>
 
                 <ReportSection title="ملخص حضور الطلاب">
-                  <div className="grid grid-cols-4 gap-3">
-                    <MiniStat label="حاضر" value={report.studentAttendance.present} color="text-primary-700" />
-                    <MiniStat label="غائب" value={report.studentAttendance.absent} color="text-red-600" />
-                    <MiniStat label="متأخر" value={report.studentAttendance.late} color="text-amber-600" />
-                    <MiniStat label="مُعتذر" value={report.studentAttendance.excused} color="text-sand-500" />
-                  </div>
+                  {(() => {
+                    const rates = attendanceRates(report.studentAttendance);
+                    return (
+                      <div className="grid grid-cols-4 gap-3">
+                        <MiniStat label="نسبة الحضور" value={`${rates.presentRate}%`} color="text-primary-700" />
+                        <MiniStat label="نسبة الغياب" value={`${rates.absentRate}%`} color="text-red-600" />
+                        <MiniStat label="نسبة التأخير" value={`${rates.lateRate}%`} color="text-amber-600" />
+                        <MiniStat label="نسبة الأعذار" value={`${rates.excusedRate}%`} color="text-sand-500" />
+                      </div>
+                    );
+                  })()}
                 </ReportSection>
 
                 <ReportSection title="ملخص حضور الموظفين">
-                  <div className="grid grid-cols-4 gap-3">
-                    <MiniStat label="حاضر" value={report.employeeAttendance.present} color="text-primary-700" />
-                    <MiniStat label="غائب" value={report.employeeAttendance.absent} color="text-red-600" />
-                    <MiniStat label="متأخر" value={report.employeeAttendance.late} color="text-amber-600" />
-                    <MiniStat label="مُعتذر" value={report.employeeAttendance.excused} color="text-sand-500" />
-                  </div>
+                  {(() => {
+                    const rates = attendanceRates(report.employeeAttendance);
+                    return (
+                      <div className="grid grid-cols-4 gap-3">
+                        <MiniStat label="نسبة الحضور" value={`${rates.presentRate}%`} color="text-primary-700" />
+                        <MiniStat label="نسبة الغياب" value={`${rates.absentRate}%`} color="text-red-600" />
+                        <MiniStat label="نسبة التأخير" value={`${rates.lateRate}%`} color="text-amber-600" />
+                        <MiniStat label="نسبة الأعذار" value={`${rates.excusedRate}%`} color="text-sand-500" />
+                      </div>
+                    );
+                  })()}
                 </ReportSection>
 
                 <ReportSection title="الملخص المالي">

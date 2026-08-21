@@ -3,6 +3,7 @@ import api from "../api/axios";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
+import { DAILY_AMOUNT_OPTIONS, findAmountOption, pagesToJuz, QURAN_TOTAL_PAGES } from "../utils/quran";
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -15,19 +16,24 @@ const GRADE_LABELS = {
 };
 
 const emptyForm = {
-  targetType: "student", // student | employee
+  targetType: "student",
   target: "",
   month: currentMonth(),
+  memAmountOption: "",
+  memCustom: "",
   memFromSurah: "",
   memFromAyah: "",
   memToSurah: "",
   memToAyah: "",
+  revAmountOption: "",
+  revCustom: "",
+  revFromSurah: "",
+  revFromAyah: "",
+  revToSurah: "",
+  revToAyah: "",
   mutoonFrom: "",
   mutoonTo: "",
-  revisionFrom: "",
-  revisionTo: "",
   grade: "",
-  newPagesCount: "",
   notes: "",
 };
 
@@ -43,6 +49,7 @@ const Hifz = () => {
   const [deleteId, setDeleteId] = useState(null);
   const [error, setError] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
+  const [attendedPreview, setAttendedPreview] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -59,9 +66,23 @@ const Hifz = () => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!form.target || !form.month) {
+      setAttendedPreview(null);
+      return;
+    }
+    const params = { month: form.month };
+    if (form.targetType === "student") params.student = form.target;
+    else params.employee = form.target;
+    api.get("/monthly-attendance", { params }).then((res) => {
+      setAttendedPreview(res.data[0]?.presentDays ?? 0);
+    });
+  }, [form.target, form.month, form.targetType]);
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
+    setAttendedPreview(null);
     setError("");
     setModalOpen(true);
   };
@@ -72,20 +93,30 @@ const Hifz = () => {
       targetType: r.student ? "student" : "employee",
       target: r.student?._id || r.employee?._id || "",
       month: r.month,
+      memAmountOption: findAmountOption(r.dailyMemPages),
+      memCustom: findAmountOption(r.dailyMemPages) === "custom" ? r.dailyMemPages : "",
       memFromSurah: r.memFromSurah || "",
       memFromAyah: r.memFromAyah ?? "",
       memToSurah: r.memToSurah || "",
       memToAyah: r.memToAyah ?? "",
+      revAmountOption: findAmountOption(r.dailyRevisionPages),
+      revCustom: findAmountOption(r.dailyRevisionPages) === "custom" ? r.dailyRevisionPages : "",
+      revFromSurah: r.revFromSurah || "",
+      revFromAyah: r.revFromAyah ?? "",
+      revToSurah: r.revToSurah || "",
+      revToAyah: r.revToAyah ?? "",
       mutoonFrom: r.mutoonFrom || "",
       mutoonTo: r.mutoonTo || "",
-      revisionFrom: r.revisionFrom || "",
-      revisionTo: r.revisionTo || "",
       grade: r.grade || "",
-      newPagesCount: r.newPagesCount ?? "",
       notes: r.notes || "",
     });
     setError("");
     setModalOpen(true);
+  };
+
+  const resolveAmount = (optionValue, customValue) => {
+    if (optionValue === "custom") return Number(customValue) || 0;
+    return Number(optionValue) || 0;
   };
 
   const handleSubmit = async (e) => {
@@ -102,16 +133,19 @@ const Hifz = () => {
         branch: targetObj?.branch?._id || targetObj?.branch,
         department: isStudent ? targetObj?.department : targetObj?.department === "both" ? "quran" : targetObj?.department,
         month: form.month,
+        dailyMemPages: resolveAmount(form.memAmountOption, form.memCustom),
         memFromSurah: form.memFromSurah,
         memFromAyah: form.memFromAyah ? Number(form.memFromAyah) : null,
         memToSurah: form.memToSurah,
         memToAyah: form.memToAyah ? Number(form.memToAyah) : null,
+        dailyRevisionPages: resolveAmount(form.revAmountOption, form.revCustom),
+        revFromSurah: form.revFromSurah,
+        revFromAyah: form.revFromAyah ? Number(form.revFromAyah) : null,
+        revToSurah: form.revToSurah,
+        revToAyah: form.revToAyah ? Number(form.revToAyah) : null,
         mutoonFrom: form.mutoonFrom,
         mutoonTo: form.mutoonTo,
-        revisionFrom: form.revisionFrom,
-        revisionTo: form.revisionTo,
         grade: form.grade,
-        newPagesCount: form.newPagesCount ? Number(form.newPagesCount) : null,
         notes: form.notes,
       };
 
@@ -134,8 +168,17 @@ const Hifz = () => {
 
   const memRange = (r) => {
     if (!r.memFromSurah && !r.memToSurah) return "—";
-    return `من ${r.memFromSurah || "—"}${r.memFromAyah ? ` (${r.memFromAyah})` : ""} إلى ${r.memToSurah || "—"}${r.memToAyah ? ` (${r.memToAyah})` : ""}`;
+    return `${r.memFromSurah || "—"}${r.memFromAyah ? `:${r.memFromAyah}` : ""} ← ${r.memToSurah || "—"}${r.memToAyah ? `:${r.memToAyah}` : ""}`;
   };
+  const revRange = (r) => {
+    if (!r.revFromSurah && !r.revToSurah) return "—";
+    return `${r.revFromSurah || "—"}${r.revFromAyah ? `:${r.revFromAyah}` : ""} ← ${r.revToSurah || "—"}${r.revToAyah ? `:${r.revToAyah}` : ""}`;
+  };
+
+  const previewMemTotal =
+    attendedPreview != null ? Math.round(attendedPreview * resolveAmount(form.memAmountOption, form.memCustom) * 100) / 100 : null;
+  const previewRevTotal =
+    attendedPreview != null ? Math.round(attendedPreview * resolveAmount(form.revAmountOption, form.revCustom) * 100) / 100 : null;
 
   return (
     <div>
@@ -157,9 +200,11 @@ const Hifz = () => {
               <tr>
                 <th>الاسم</th>
                 <th>الشهر</th>
+                <th>أيام الحضور</th>
                 <th>الحفظ الجديد</th>
-                <th>المتون</th>
+                <th>إجمالي الحفظ</th>
                 <th>المراجعة</th>
+                <th>إجمالي المراجعة</th>
                 <th>التقييم</th>
                 <th></th>
               </tr>
@@ -169,9 +214,14 @@ const Hifz = () => {
                 <tr key={r._id}>
                   <td className="font-semibold">{r.student?.name || r.employee?.name}</td>
                   <td>{r.month}</td>
+                  <td>{r.attendedDays}</td>
                   <td className="text-sm">{memRange(r)}</td>
-                  <td className="text-sm">{r.mutoonFrom || r.mutoonTo ? `${r.mutoonFrom || "—"} إلى ${r.mutoonTo || "—"}` : "—"}</td>
-                  <td className="text-sm">{r.revisionFrom || r.revisionTo ? `${r.revisionFrom || "—"} إلى ${r.revisionTo || "—"}` : "—"}</td>
+                  <td className="text-sm font-semibold text-primary-700">
+                    {r.totalMemPages} صفحة
+                    <span className="text-sand-400 font-normal"> (~{pagesToJuz(r.totalMemPages)} جزء)</span>
+                  </td>
+                  <td className="text-sm">{revRange(r)}</td>
+                  <td className="text-sm font-semibold text-sand-700">{r.totalRevisionPages} صفحة</td>
                   <td>{r.grade ? <span className="badge bg-primary-50 text-primary-700">{GRADE_LABELS[r.grade]}</span> : "—"}</td>
                   <td>
                     <div className="flex gap-2">
@@ -182,7 +232,7 @@ const Hifz = () => {
                 </tr>
               ))}
               {records.length === 0 && (
-                <tr><td colSpan={7} className="text-center text-sand-400 py-8">لا توجد سجلات حفظ بعد</td></tr>
+                <tr><td colSpan={9} className="text-center text-sand-400 py-8">لا توجد سجلات حفظ بعد</td></tr>
               )}
             </tbody>
           </table>
@@ -222,8 +272,31 @@ const Hifz = () => {
             <input className="input" type="month" required disabled={!!editing} value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} />
           </div>
 
+          {attendedPreview !== null && (
+            <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2">
+              📅 عدد أيام الحضور المسجلة لهذا الشهر: <strong>{attendedPreview}</strong> يوم (من صفحة الحضور والغياب)
+            </div>
+          )}
+
           <div className="border border-sand-200 rounded-xl p-3">
             <p className="font-semibold text-sand-700 text-sm mb-2">الحفظ الجديد</p>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="label">المقدار اليومي</label>
+                <select className="input" value={form.memAmountOption} onChange={(e) => setForm({ ...form, memAmountOption: e.target.value })}>
+                  <option value="">اختر المقدار</option>
+                  {DAILY_AMOUNT_OPTIONS.map((o) => (
+                    <option key={o.label} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              {form.memAmountOption === "custom" && (
+                <div>
+                  <label className="label">حدد عدد الصفحات</label>
+                  <input className="input" type="number" step="0.1" value={form.memCustom} onChange={(e) => setForm({ ...form, memCustom: e.target.value })} />
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex gap-2">
                 <input className="input" placeholder="من سورة" value={form.memFromSurah} onChange={(e) => setForm({ ...form, memFromSurah: e.target.value })} />
@@ -234,6 +307,45 @@ const Hifz = () => {
                 <input className="input w-24" type="number" placeholder="آية" value={form.memToAyah} onChange={(e) => setForm({ ...form, memToAyah: e.target.value })} />
               </div>
             </div>
+            {previewMemTotal !== null && form.memAmountOption && (
+              <p className="text-xs text-primary-700 mt-2">
+                📖 الإجمالي المتوقع: <strong>{previewMemTotal}</strong> صفحة (~{pagesToJuz(previewMemTotal)} جزء من {QURAN_TOTAL_PAGES} صفحة)
+              </p>
+            )}
+          </div>
+
+          <div className="border border-sand-200 rounded-xl p-3">
+            <p className="font-semibold text-sand-700 text-sm mb-2">المراجعة</p>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="label">المقدار اليومي</label>
+                <select className="input" value={form.revAmountOption} onChange={(e) => setForm({ ...form, revAmountOption: e.target.value })}>
+                  <option value="">اختر المقدار</option>
+                  {DAILY_AMOUNT_OPTIONS.map((o) => (
+                    <option key={o.label} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              {form.revAmountOption === "custom" && (
+                <div>
+                  <label className="label">حدد عدد الصفحات</label>
+                  <input className="input" type="number" step="0.1" value={form.revCustom} onChange={(e) => setForm({ ...form, revCustom: e.target.value })} />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex gap-2">
+                <input className="input" placeholder="من سورة" value={form.revFromSurah} onChange={(e) => setForm({ ...form, revFromSurah: e.target.value })} />
+                <input className="input w-24" type="number" placeholder="آية" value={form.revFromAyah} onChange={(e) => setForm({ ...form, revFromAyah: e.target.value })} />
+              </div>
+              <div className="flex gap-2">
+                <input className="input" placeholder="إلى سورة" value={form.revToSurah} onChange={(e) => setForm({ ...form, revToSurah: e.target.value })} />
+                <input className="input w-24" type="number" placeholder="آية" value={form.revToAyah} onChange={(e) => setForm({ ...form, revToAyah: e.target.value })} />
+              </div>
+            </div>
+            {previewRevTotal !== null && form.revAmountOption && (
+              <p className="text-xs text-sand-600 mt-2">🔄 إجمالي المراجعة المتوقع: <strong>{previewRevTotal}</strong> صفحة</p>
+            )}
           </div>
 
           <div className="border border-sand-200 rounded-xl p-3">
@@ -244,28 +356,14 @@ const Hifz = () => {
             </div>
           </div>
 
-          <div className="border border-sand-200 rounded-xl p-3">
-            <p className="font-semibold text-sand-700 text-sm mb-2">المراجعة</p>
-            <div className="grid grid-cols-2 gap-3">
-              <input className="input" placeholder="من" value={form.revisionFrom} onChange={(e) => setForm({ ...form, revisionFrom: e.target.value })} />
-              <input className="input" placeholder="إلى" value={form.revisionTo} onChange={(e) => setForm({ ...form, revisionTo: e.target.value })} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">التقييم العام</label>
-              <select className="input" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })}>
-                <option value="">بدون تقييم</option>
-                {Object.entries(GRADE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">عدد الصفحات الجديدة</label>
-              <input className="input" type="number" value={form.newPagesCount} onChange={(e) => setForm({ ...form, newPagesCount: e.target.value })} />
-            </div>
+          <div>
+            <label className="label">التقييم العام</label>
+            <select className="input" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })}>
+              <option value="">بدون تقييم</option>
+              {Object.entries(GRADE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
           </div>
 
           <div>

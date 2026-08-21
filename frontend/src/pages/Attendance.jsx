@@ -7,8 +7,7 @@ import { useAuth } from "../context/AuthContext";
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
 const emptyForm = {
-  targetType: "student", // student | employee
-  target: "",
+  student: "",
   month: currentMonth(),
   presentDays: "",
   absentDays: "",
@@ -17,12 +16,13 @@ const emptyForm = {
   notes: "",
 };
 
+// صفحة الحضور والغياب الشهري - خاصة بالطلاب فقط
+// (الموظفين لهم صفحة منفصلة "حضور الموظفين" يومية)
 const Attendance = () => {
   const { user } = useAuth();
-  const canManage = user.role !== "employee";
+  const canManage = user.role !== "employee"; // الأدمن ومدير الفرع بس يقدروا يعدلوا/يحذفوا
   const [records, setRecords] = useState([]);
   const [students, setStudents] = useState([]);
-  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -35,15 +35,13 @@ const Attendance = () => {
     setLoading(true);
     const params = {};
     if (filterMonth) params.month = filterMonth;
-    api.get("/monthly-attendance", { params }).then((res) => setRecords(res.data)).finally(() => setLoading(false));
+    api.get("/monthly-attendance", { params }).then((res) => setRecords(res.data.filter((r) => r.student))).finally(() => setLoading(false));
   };
 
   useEffect(load, [filterMonth]);
   useEffect(() => {
-    if (canManage) {
-      api.get("/students").then((res) => setStudents(res.data));
-      api.get("/users", { params: { role: "employee" } }).then((res) => setEmployees(res.data));
-    }
+    // الموظف هيشوف طلابه هو بس تلقائيًا (الباك اند بيقيدها)
+    api.get("/students").then((res) => setStudents(res.data));
   }, []);
 
   const openCreate = () => {
@@ -56,8 +54,7 @@ const Attendance = () => {
   const openEdit = (r) => {
     setEditing(r);
     setForm({
-      targetType: r.student ? "student" : "employee",
-      target: r.student?._id || r.employee?._id || "",
+      student: r.student?._id || "",
       month: r.month,
       presentDays: r.presentDays,
       absentDays: r.absentDays,
@@ -73,15 +70,12 @@ const Attendance = () => {
     e.preventDefault();
     setError("");
     try {
-      const isStudent = form.targetType === "student";
-      const targetList = isStudent ? students : employees;
-      const targetObj = targetList.find((t) => t._id === form.target);
+      const studentObj = students.find((s) => s._id === form.student);
 
       const payload = {
-        student: isStudent ? form.target : null,
-        employee: isStudent ? null : form.target,
-        branch: targetObj?.branch?._id || targetObj?.branch,
-        department: isStudent ? targetObj?.department : targetObj?.department === "both" ? "quran" : targetObj?.department,
+        student: form.student,
+        branch: studentObj?.branch?._id || studentObj?.branch,
+        department: studentObj?.department,
         month: form.month,
         presentDays: Number(form.presentDays),
         absentDays: Number(form.absentDays),
@@ -110,9 +104,15 @@ const Attendance = () => {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-sand-900">الحضور والغياب الشهري</h1>
-        {canManage && <button className="btn-primary" onClick={openCreate}>+ إضافة سجل حضور</button>}
+        <h1 className="text-2xl font-bold text-sand-900">الحضور والغياب الشهري (الطلاب)</h1>
+        <button className="btn-primary" onClick={openCreate}>+ إضافة سجل حضور</button>
       </div>
+
+      {!canManage && (
+        <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">
+          تقدر تضيف سجلات حضور جديدة لطلابك، لكن التعديل والحذف متاحين لمدير الفرع أو الأدمن فقط.
+        </div>
+      )}
 
       <div className="flex gap-3 mb-4">
         <input type="month" className="input max-w-[180px]" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} />
@@ -125,7 +125,7 @@ const Attendance = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>الاسم</th>
+                <th>اسم الطالب</th>
                 <th>الشهر</th>
                 <th>أيام الحضور</th>
                 <th>أيام الغياب</th>
@@ -137,7 +137,7 @@ const Attendance = () => {
             <tbody>
               {records.map((r) => (
                 <tr key={r._id}>
-                  <td className="font-semibold">{r.student?.name || r.employee?.name}</td>
+                  <td className="font-semibold">{r.student?.name}</td>
                   <td>{r.month}</td>
                   <td className="text-primary-700 font-bold">{r.presentDays}</td>
                   <td className="text-red-600 font-bold">{r.absentDays}</td>
@@ -165,28 +165,14 @@ const Attendance = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">النوع</label>
-              <select
-                className="input"
-                disabled={!!editing}
-                value={form.targetType}
-                onChange={(e) => setForm({ ...form, targetType: e.target.value, target: "" })}
-              >
-                <option value="student">طالب</option>
-                <option value="employee">موظف</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">{form.targetType === "student" ? "الطالب" : "الموظف"}</label>
-              <select className="input" required disabled={!!editing} value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })}>
-                <option value="">اختر</option>
-                {(form.targetType === "student" ? students : employees).map((t) => (
-                  <option key={t._id} value={t._id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="label">الطالب</label>
+            <select className="input" required disabled={!!editing} value={form.student} onChange={(e) => setForm({ ...form, student: e.target.value })}>
+              <option value="">اختر الطالب</option>
+              {students.map((s) => (
+                <option key={s._id} value={s._id}>{s.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>

@@ -49,7 +49,7 @@ const Dashboard = () => {
       )}
 
       {user?.role === "super_admin" && stats?.performance && (
-        <div className="card">
+        <div className="card mb-6">
           <h2 className="font-bold text-sand-800 mb-4">📊 الأداء العام هذا الشهر</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
             <PerformanceBar label="نسبة الحضور" value={stats.performance.attendanceRate} />
