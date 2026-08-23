@@ -3,7 +3,7 @@ import api from "../api/axios";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
-import { DAILY_AMOUNT_OPTIONS, findAmountOption, pagesToJuz, QURAN_TOTAL_PAGES } from "../utils/quran";
+import { DAILY_AMOUNT_OPTIONS, findAmountOption, unitToPages, formatPages } from "../utils/quran";
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -21,12 +21,14 @@ const emptyForm = {
   month: currentMonth(),
   memAmountOption: "",
   memCustom: "",
+  memCustomUnit: "pages",
   memFromSurah: "",
   memFromAyah: "",
   memToSurah: "",
   memToAyah: "",
   revAmountOption: "",
   revCustom: "",
+  revCustomUnit: "pages",
   revFromSurah: "",
   revFromAyah: "",
   revToSurah: "",
@@ -95,12 +97,14 @@ const Hifz = () => {
       month: r.month,
       memAmountOption: findAmountOption(r.dailyMemPages),
       memCustom: findAmountOption(r.dailyMemPages) === "custom" ? r.dailyMemPages : "",
+      memCustomUnit: "pages",
       memFromSurah: r.memFromSurah || "",
       memFromAyah: r.memFromAyah ?? "",
       memToSurah: r.memToSurah || "",
       memToAyah: r.memToAyah ?? "",
       revAmountOption: findAmountOption(r.dailyRevisionPages),
       revCustom: findAmountOption(r.dailyRevisionPages) === "custom" ? r.dailyRevisionPages : "",
+      revCustomUnit: "pages",
       revFromSurah: r.revFromSurah || "",
       revFromAyah: r.revFromAyah ?? "",
       revToSurah: r.revToSurah || "",
@@ -114,8 +118,9 @@ const Hifz = () => {
     setModalOpen(true);
   };
 
-  const resolveAmount = (optionValue, customValue) => {
-    if (optionValue === "custom") return Number(customValue) || 0;
+  // يحول قيمة الاختيار (رقم ثابت أو "custom") لعدد صفحات فعلي، مع مراعاة وحدة التحديد اليدوي (صفحات/أجزاء)
+  const resolveAmount = (optionValue, customValue, customUnit) => {
+    if (optionValue === "custom") return unitToPages(customValue, customUnit);
     return Number(optionValue) || 0;
   };
 
@@ -133,12 +138,12 @@ const Hifz = () => {
         branch: targetObj?.branch?._id || targetObj?.branch,
         department: isStudent ? targetObj?.department : targetObj?.department === "both" ? "quran" : targetObj?.department,
         month: form.month,
-        dailyMemPages: resolveAmount(form.memAmountOption, form.memCustom),
+        dailyMemPages: resolveAmount(form.memAmountOption, form.memCustom, form.memCustomUnit),
         memFromSurah: form.memFromSurah,
         memFromAyah: form.memFromAyah ? Number(form.memFromAyah) : null,
         memToSurah: form.memToSurah,
         memToAyah: form.memToAyah ? Number(form.memToAyah) : null,
-        dailyRevisionPages: resolveAmount(form.revAmountOption, form.revCustom),
+        dailyRevisionPages: resolveAmount(form.revAmountOption, form.revCustom, form.revCustomUnit),
         revFromSurah: form.revFromSurah,
         revFromAyah: form.revFromAyah ? Number(form.revFromAyah) : null,
         revToSurah: form.revToSurah,
@@ -176,9 +181,9 @@ const Hifz = () => {
   };
 
   const previewMemTotal =
-    attendedPreview != null ? Math.round(attendedPreview * resolveAmount(form.memAmountOption, form.memCustom) * 100) / 100 : null;
+    attendedPreview != null ? Math.round(attendedPreview * resolveAmount(form.memAmountOption, form.memCustom, form.memCustomUnit) * 100) / 100 : null;
   const previewRevTotal =
-    attendedPreview != null ? Math.round(attendedPreview * resolveAmount(form.revAmountOption, form.revCustom) * 100) / 100 : null;
+    attendedPreview != null ? Math.round(attendedPreview * resolveAmount(form.revAmountOption, form.revCustom, form.revCustomUnit) * 100) / 100 : null;
 
   return (
     <div>
@@ -198,6 +203,7 @@ const Hifz = () => {
           <table className="data-table">
             <thead>
               <tr>
+                <th>#</th>
                 <th>الاسم</th>
                 <th>الشهر</th>
                 <th>أيام الحضور</th>
@@ -210,18 +216,16 @@ const Hifz = () => {
               </tr>
             </thead>
             <tbody>
-              {records.map((r) => (
+              {records.map((r, i) => (
                 <tr key={r._id}>
+                  <td className="text-sand-400">{i + 1}</td>
                   <td className="font-semibold">{r.student?.name || r.employee?.name}</td>
                   <td>{r.month}</td>
                   <td>{r.attendedDays}</td>
                   <td className="text-sm">{memRange(r)}</td>
-                  <td className="text-sm font-semibold text-primary-700">
-                    {r.totalMemPages} صفحة
-                    <span className="text-sand-400 font-normal"> (~{pagesToJuz(r.totalMemPages)} جزء)</span>
-                  </td>
+                  <td className="text-base font-bold text-primary-700">{formatPages(r.totalMemPages)}</td>
                   <td className="text-sm">{revRange(r)}</td>
-                  <td className="text-sm font-semibold text-sand-700">{r.totalRevisionPages} صفحة</td>
+                  <td className="text-base font-bold text-sand-700">{formatPages(r.totalRevisionPages)}</td>
                   <td>{r.grade ? <span className="badge bg-primary-50 text-primary-700">{GRADE_LABELS[r.grade]}</span> : "—"}</td>
                   <td>
                     <div className="flex gap-2">
@@ -232,7 +236,7 @@ const Hifz = () => {
                 </tr>
               ))}
               {records.length === 0 && (
-                <tr><td colSpan={9} className="text-center text-sand-400 py-8">لا توجد سجلات حفظ بعد</td></tr>
+                <tr><td colSpan={10} className="text-center text-sand-400 py-8">لا توجد سجلات حفظ بعد</td></tr>
               )}
             </tbody>
           </table>
@@ -278,6 +282,7 @@ const Hifz = () => {
             </div>
           )}
 
+          {/* ==== الحفظ الجديد ==== */}
           <div className="border border-sand-200 rounded-xl p-3">
             <p className="font-semibold text-sand-700 text-sm mb-2">الحفظ الجديد</p>
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -291,9 +296,15 @@ const Hifz = () => {
                 </select>
               </div>
               {form.memAmountOption === "custom" && (
-                <div>
-                  <label className="label">حدد عدد الصفحات</label>
-                  <input className="input" type="number" step="0.1" value={form.memCustom} onChange={(e) => setForm({ ...form, memCustom: e.target.value })} />
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="label">حدد الكمية</label>
+                    <input className="input" type="number" step="0.1" value={form.memCustom} onChange={(e) => setForm({ ...form, memCustom: e.target.value })} />
+                  </div>
+                  <select className="input w-28" value={form.memCustomUnit} onChange={(e) => setForm({ ...form, memCustomUnit: e.target.value })}>
+                    <option value="pages">صفحة</option>
+                    <option value="juz">جزء</option>
+                  </select>
                 </div>
               )}
             </div>
@@ -308,12 +319,14 @@ const Hifz = () => {
               </div>
             </div>
             {previewMemTotal !== null && form.memAmountOption && (
-              <p className="text-xs text-primary-700 mt-2">
-                📖 الإجمالي المتوقع: <strong>{previewMemTotal}</strong> صفحة (~{pagesToJuz(previewMemTotal)} جزء من {QURAN_TOTAL_PAGES} صفحة)
-              </p>
+              <div className="mt-3 bg-primary-50 rounded-xl px-4 py-3 text-center">
+                <p className="text-xs text-primary-600 mb-1">📖 الإجمالي المتوقع</p>
+                <p className="text-2xl font-extrabold text-primary-700">{formatPages(previewMemTotal)}</p>
+              </div>
             )}
           </div>
 
+          {/* ==== المراجعة ==== */}
           <div className="border border-sand-200 rounded-xl p-3">
             <p className="font-semibold text-sand-700 text-sm mb-2">المراجعة</p>
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -327,9 +340,15 @@ const Hifz = () => {
                 </select>
               </div>
               {form.revAmountOption === "custom" && (
-                <div>
-                  <label className="label">حدد عدد الصفحات</label>
-                  <input className="input" type="number" step="0.1" value={form.revCustom} onChange={(e) => setForm({ ...form, revCustom: e.target.value })} />
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="label">حدد الكمية</label>
+                    <input className="input" type="number" step="0.1" value={form.revCustom} onChange={(e) => setForm({ ...form, revCustom: e.target.value })} />
+                  </div>
+                  <select className="input w-28" value={form.revCustomUnit} onChange={(e) => setForm({ ...form, revCustomUnit: e.target.value })}>
+                    <option value="pages">صفحة</option>
+                    <option value="juz">جزء</option>
+                  </select>
                 </div>
               )}
             </div>
@@ -344,7 +363,10 @@ const Hifz = () => {
               </div>
             </div>
             {previewRevTotal !== null && form.revAmountOption && (
-              <p className="text-xs text-sand-600 mt-2">🔄 إجمالي المراجعة المتوقع: <strong>{previewRevTotal}</strong> صفحة</p>
+              <div className="mt-3 bg-sand-100 rounded-xl px-4 py-3 text-center">
+                <p className="text-xs text-sand-500 mb-1">🔄 إجمالي المراجعة المتوقع</p>
+                <p className="text-2xl font-extrabold text-sand-700">{formatPages(previewRevTotal)}</p>
+              </div>
             )}
           </div>
 

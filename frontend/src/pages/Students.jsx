@@ -186,6 +186,7 @@ const Students = () => {
           <table className="data-table">
             <thead>
               <tr>
+                <th>#</th>
                 <th></th>
                 <th>الاسم</th>
                 <th>السن</th>
@@ -199,8 +200,9 @@ const Students = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s) => (
+              {filtered.map((s, idx) => (
                 <tr key={s._id}>
+                  <td className="text-sand-400">{idx + 1}</td>
                   <td>
                     {s.photoUrl ? (
                       <img src={resolveMediaUrl(s.photoUrl)} alt={s.name} className="w-9 h-9 rounded-full object-cover" />
@@ -234,7 +236,7 @@ const Students = () => {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center text-sand-400 py-8">لا يوجد طلاب</td>
+                  <td colSpan={11} className="text-center text-sand-400 py-8">لا يوجد طلاب</td>
                 </tr>
               )}
             </tbody>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
+import { formatPages } from "../utils/quran";
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -52,6 +53,11 @@ const attendanceRates = (summary) => {
 const memRange = (r) => {
   if (!r.memFromSurah && !r.memToSurah) return null;
   return `من ${r.memFromSurah || "—"}${r.memFromAyah ? ` (آية ${r.memFromAyah})` : ""} إلى ${r.memToSurah || "—"}${r.memToAyah ? ` (آية ${r.memToAyah})` : ""}`;
+};
+
+const revRange = (r) => {
+  if (!r.revFromSurah && !r.revToSurah) return null;
+  return `من ${r.revFromSurah || "—"}${r.revFromAyah ? ` (آية ${r.revFromAyah})` : ""} إلى ${r.revToSurah || "—"}${r.revToAyah ? ` (آية ${r.revToAyah})` : ""}`;
 };
 
 const Reports = () => {
@@ -327,20 +333,29 @@ const Reports = () => {
 
                 <ReportSection title="الحفظ الشهري">
                   {report.hifz ? (
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-3 text-sm">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-primary-50 rounded-xl px-3 py-2 text-center">
+                          <p className="text-xs text-primary-600 mb-1">📖 إجمالي الحفظ الجديد</p>
+                          <p className="text-lg font-extrabold text-primary-700">{formatPages(report.hifz.totalMemPages)}</p>
+                        </div>
+                        <div className="bg-sand-100 rounded-xl px-3 py-2 text-center">
+                          <p className="text-xs text-sand-500 mb-1">🔄 إجمالي المراجعة</p>
+                          <p className="text-lg font-extrabold text-sand-700">{formatPages(report.hifz.totalRevisionPages)}</p>
+                        </div>
+                      </div>
                       {memRange(report.hifz) && (
                         <p><span className="text-sand-500">الحفظ الجديد: </span><span className="font-semibold">{memRange(report.hifz)}</span></p>
+                      )}
+                      {revRange(report.hifz) && (
+                        <p><span className="text-sand-500">المراجعة: </span><span className="font-semibold">{revRange(report.hifz)}</span></p>
                       )}
                       {(report.hifz.mutoonFrom || report.hifz.mutoonTo) && (
                         <p><span className="text-sand-500">المتون: </span><span className="font-semibold">من {report.hifz.mutoonFrom || "—"} إلى {report.hifz.mutoonTo || "—"}</span></p>
                       )}
-                      {(report.hifz.revisionFrom || report.hifz.revisionTo) && (
-                        <p><span className="text-sand-500">المراجعة: </span><span className="font-semibold">من {report.hifz.revisionFrom || "—"} إلى {report.hifz.revisionTo || "—"}</span></p>
+                      {report.hifz.grade && (
+                        <span className="badge bg-primary-50 text-primary-700">التقييم: {GRADE_LABELS[report.hifz.grade]}</span>
                       )}
-                      <div className="flex gap-4 pt-1">
-                        {report.hifz.grade && <span className="badge bg-primary-50 text-primary-700">التقييم: {GRADE_LABELS[report.hifz.grade]}</span>}
-                        {report.hifz.newPagesCount != null && <span className="badge bg-sand-100 text-sand-700">{report.hifz.newPagesCount} صفحة جديدة</span>}
-                      </div>
                       {report.hifz.notes && <p className="text-sand-500 pt-1">ملاحظات: {report.hifz.notes}</p>}
                     </div>
                   ) : (
@@ -527,6 +542,21 @@ const Reports = () => {
                   )}
                 </ReportSection>
               </>
+            )}
+
+            {report.type === "student" && (
+              <div className="grid grid-cols-2 gap-8 mt-10 pt-6">
+                <div className="text-center">
+                  <div className="border-t border-sand-400 pt-2 mt-8 mx-6">
+                    <p className="text-sand-600 text-sm font-semibold">توقيع ولي الأمر</p>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="border-t border-sand-400 pt-2 mt-8 mx-6">
+                    <p className="text-sand-600 text-sm font-semibold">توقيع مدير الفرع</p>
+                  </div>
+                </div>
+              </div>
             )}
 
             <div className="mt-8 pt-4 border-t border-sand-200 text-center text-xs text-sand-400">
