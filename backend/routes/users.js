@@ -81,8 +81,6 @@ router.put("/:id", allowRoles(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER), async (r
 
     const payload = { ...req.body };
     if (payload.password === "") delete payload.password; // منع مسح الباسورد بالغلط
-    // تغيير كلمة مرور مستخدم آخر مسموح للأدمن الرئيسي فقط
-    if (req.user.role !== ROLES.SUPER_ADMIN) delete payload.password;
 
     Object.assign(target, payload);
     await target.save();

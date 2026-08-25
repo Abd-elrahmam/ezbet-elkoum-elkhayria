@@ -1,62 +1,54 @@
 const mongoose = require("mongoose");
 const { DEPARTMENTS } = require("../utils/constants");
 
+const GRADES = ["excellent", "very_good", "good", "acceptable", "weak"];
+const HIFZ_STATUS = ["normal", "khatm", "review_only"];
+
+// سجل الحفظ الشهري: حفظ جديد + مراجعة + متون، لطالب أو موظف (مدرس بيحفظ هو كمان)
 const hifzSchema = new mongoose.Schema(
   {
-    // إما طالب أو موظف (واحد منهم فقط)
+    branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch", required: true },
+    department: { type: String, enum: Object.values(DEPARTMENTS), default: "quran" },
     student: { type: mongoose.Schema.Types.ObjectId, ref: "Student", default: null },
     employee: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch", required: true },
-    department: { type: String, enum: Object.values(DEPARTMENTS), required: true },
-    month: { type: String, required: true }, // "2026-08"
+    teacher: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    month: { type: String, required: true }, // "YYYY-MM"
 
-    // ==== الحفظ الجديد ====
-    // مقدار الحفظ اليومي بالصفحات (نص صفحة = 0.5، سطر ~ 0.067 ... إلخ)
-    dailyMemPages: { type: Number, default: 0 },
+    // حالة خاصة: عادي / ختم القرآن / مراجعة فقط (بدون حفظ جديد)
+    status: { type: String, enum: HIFZ_STATUS, default: "normal" },
+
+    // معدل الحفظ اليومي (صفحة) وأيام الحضور، لحساب "المتوقع" مقابل "المحفوظ فعليًا"
+    dailyRatePages: { type: Number, min: 0, default: null },
+    presentDays: { type: Number, min: 0, default: null },
+    expectedPages: { type: Number, min: 0, default: null },
+
+    // الحفظ الجديد
     memFromSurah: { type: String, trim: true, default: "" },
     memFromAyah: { type: Number, default: null },
     memToSurah: { type: String, trim: true, default: "" },
     memToAyah: { type: Number, default: null },
+    totalMemPages: { type: Number, min: 0, default: 0 },
 
-    // ==== المراجعة ====
-    dailyRevisionPages: { type: Number, default: 0 },
+    // المراجعة
     revFromSurah: { type: String, trim: true, default: "" },
     revFromAyah: { type: Number, default: null },
     revToSurah: { type: String, trim: true, default: "" },
     revToAyah: { type: Number, default: null },
+    totalRevisionPages: { type: Number, min: 0, default: 0 },
 
-    // المتون (نص حر لأنها مش موحّدة زي سور القرآن)
+    // المتون (لبعض الحلقات بتحفظ متون بجانب القرآن)
     mutoonFrom: { type: String, trim: true, default: "" },
     mutoonTo: { type: String, trim: true, default: "" },
 
-    // عدد أيام الحضور المستخدمة في حساب الحفظ/المراجعة (نسخة وقت الحفظ، عشان التقرير يفضل صحيح حتى لو الحضور اتعدل بعدين)
-    attendedDays: { type: Number, default: 0 },
-
-    // النتائج المحسوبة تلقائيًا (بالصفحات)
-    totalMemPages: { type: Number, default: 0 },
-    totalRevisionPages: { type: Number, default: 0 },
-
-    grade: {
-      type: String,
-      enum: ["excellent", "very_good", "good", "acceptable", "weak", ""],
-      default: "",
-    },
-
+    grade: { type: String, enum: [...GRADES, null], default: null },
     notes: { type: String, trim: true, default: "" },
-    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );
 
-// يحسب إجمالي الحفظ والمراجعة تلقائيًا (أيام الحضور × المقدار اليومي)
-hifzSchema.pre("save", function (next) {
-  const days = this.attendedDays || 0;
-  this.totalMemPages = Math.round((days * (this.dailyMemPages || 0)) * 100) / 100;
-  this.totalRevisionPages = Math.round((days * (this.dailyRevisionPages || 0)) * 100) / 100;
-  next();
-});
-
-hifzSchema.index({ student: 1, month: 1 });
-hifzSchema.index({ employee: 1, month: 1 });
+hifzSchema.index({ student: 1, month: 1 }, { unique: true, sparse: true });
+hifzSchema.index({ employee: 1, month: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Hifz", hifzSchema);
+module.exports.GRADES = GRADES;
+module.exports.HIFZ_STATUS = HIFZ_STATUS;

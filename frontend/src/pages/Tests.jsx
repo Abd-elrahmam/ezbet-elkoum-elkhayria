@@ -159,8 +159,8 @@ const Tests = () => {
             <div>
               <label className="label">القسم</label>
               <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
-                <option value="nursery">الحضانة</option>
                 <option value="quran">الكتاب</option>
+                <option value="nursery">الحضانة</option>
               </select>
             </div>
             <div>

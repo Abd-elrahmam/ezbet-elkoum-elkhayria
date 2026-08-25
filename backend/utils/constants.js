@@ -25,4 +25,14 @@ const ATTENDANCE_STATUS = {
   EXCUSED: "excused",
 };
 
-module.exports = { ROLES, DEPARTMENTS, TEST_TYPES, ATTENDANCE_STATUS };
+// عدد أيام الشهر المعتمد في ملخصات الحضور الشهري وحساب مقدار الحفظ المتوقع
+const MONTH_TOTAL_DAYS = 20;
+
+// حالات مقدار الحفظ الشهري
+const MEMORIZATION_STATUS = {
+  NORMAL: "normal", // عادي - له مقدار حفظ متوقع محسوب
+  KHATM: "khatm", // ختم القرآن كاملًا - حالة مميزة
+  REVIEW_ONLY: "review_only", // مراجعة فقط - بدون مقدار حفظ جديد متوقع
+};
+
+module.exports = { ROLES, DEPARTMENTS, TEST_TYPES, ATTENDANCE_STATUS, MONTH_TOTAL_DAYS, MEMORIZATION_STATUS };

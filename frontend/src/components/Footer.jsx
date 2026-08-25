@@ -9,30 +9,20 @@ const WhatsAppIcon = () => (
 const DEVELOPER_NAME = "عبدالرحمن فضل";
 const DEVELOPER_WHATSAPP = "201021330018"; // رقم ثابت، مش قابل للتعديل من لوحة الإعدادات
 
-const Footer = () => {
-  const whatsappLink =
-    `https://wa.me/${DEVELOPER_WHATSAPP}?text=` +
-    encodeURIComponent("السلام عليكم، حابب أتواصل معاك بخصوص انشاء موقع.");
-
+const Footer = ({ whatsappNumber = "201021330018" }) => {
   return (
     <footer className="border-t border-sand-100 bg-white/80 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs sm:text-sm">
         <p className="text-sand-500">
-          © {new Date().getFullYear()} جمعية العلوم الخيرية بعزبة الكوم — جميع
-          الحقوق محفوظة
+          © {new Date().getFullYear()} جمعية العلوم الخيرية بعزبة الكوم — جميع الحقوق محفوظة
         </p>
         <div className="flex items-center gap-2">
           <span className="text-sand-400">تم التصميم والتطوير بواسطة</span>
-          <a
-            href={whatsappLink}
-            target="_blank"
-            rel="noreferrer"
-            className="font-bold bg-gradient-to-l from-primary-600 to-primary-800 bg-clip-text text-transparent hover:opacity-80 transition"
-          >
+          <span className="font-bold bg-gradient-to-l from-primary-600 to-primary-800 bg-clip-text text-transparent">
             {DEVELOPER_NAME}
-          </a>
+          </span>
           <a
-            href={whatsappLink}
+            href={`https://wa.me/${DEVELOPER_WHATSAPP}`}
             target="_blank"
             rel="noreferrer"
             className="w-7 h-7 rounded-full bg-[#25D366] text-white flex items-center justify-center hover:scale-110 transition shadow-sm"

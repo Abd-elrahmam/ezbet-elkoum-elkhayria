@@ -19,7 +19,6 @@ const Payments = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState(null);
   const [error, setError] = useState("");
@@ -38,22 +37,7 @@ const Payments = () => {
   }, []);
 
   const openCreate = () => {
-    setEditing(null);
     setForm(emptyForm);
-    setError("");
-    setModalOpen(true);
-  };
-
-  const openEdit = (p) => {
-    setEditing(p);
-    setForm({
-      student: p.student?._id || "",
-      amount: p.amount,
-      month: p.month,
-      date: p.date?.slice(0, 10),
-      method: p.method,
-      notes: p.notes || "",
-    });
     setError("");
     setModalOpen(true);
   };
@@ -62,12 +46,8 @@ const Payments = () => {
     e.preventDefault();
     setError("");
     try {
-      if (editing) {
-        await api.put(`/payments/${editing._id}`, form);
-      } else {
-        const student = students.find((s) => s._id === form.student);
-        await api.post("/payments", { ...form, branch: student?.branch?._id || student?.branch, department: student?.department });
-      }
+      const student = students.find((s) => s._id === form.student);
+      await api.post("/payments", { ...form, branch: student?.branch?._id || student?.branch, department: student?.department });
       setModalOpen(false);
       load();
     } catch (err) {
@@ -118,10 +98,7 @@ const Payments = () => {
                   <td>{p.method === "cash" ? "نقدًا" : p.method === "transfer" ? "تحويل" : "أخرى"}</td>
                   <td>{p.date?.slice(0, 10)}</td>
                   <td>
-                    <div className="flex gap-2">
-                      <button className="btn-ghost" onClick={() => openEdit(p)}>تعديل</button>
-                      <button className="btn-ghost text-red-500" onClick={() => setDeleteId(p._id)}>حذف</button>
-                    </div>
+                    <button className="btn-ghost text-red-500" onClick={() => setDeleteId(p._id)}>حذف</button>
                   </td>
                 </tr>
               ))}
@@ -133,7 +110,7 @@ const Payments = () => {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "تعديل الدفعة" : "تسجيل دفعة جديدة"}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="تسجيل دفعة جديدة">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
           <div>
@@ -173,7 +150,7 @@ const Payments = () => {
             <label className="label">ملاحظات</label>
             <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
-          <button className="btn-primary w-full justify-center">{editing ? "حفظ التعديلات" : "تسجيل الدفعة"}</button>
+          <button className="btn-primary w-full justify-center">تسجيل الدفعة</button>
         </form>
       </Modal>
 

@@ -4,12 +4,11 @@ import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
 
-const emptyForm = { title: "", description: "", date: new Date().toISOString().slice(0, 10), prize: "", notes: "", branch: "" };
+const emptyForm = { title: "", description: "", date: new Date().toISOString().slice(0, 10), prize: "", notes: "" };
 
 const Competitions = () => {
   const { user } = useAuth();
   const [competitions, setCompetitions] = useState([]);
-  const [branches, setBranches] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -26,22 +25,12 @@ const Competitions = () => {
 
   useEffect(load, []);
   useEffect(() => {
-    if (user.role === "super_admin") api.get("/branches").then((res) => setBranches(res.data));
+    api.get("/users", { params: { role: "employee" } }).then((res) => setEmployees(res.data));
   }, []);
-
-  useEffect(() => {
-    // تحميل الموظفين حسب الفرع المختار (أو فرع المستخدم لو مش أدمن رئيسي)
-    const branchId = form.branch || (user.role !== "super_admin" ? user.branch?._id || user.branch : "");
-    if (!branchId) {
-      setEmployees([]);
-      return;
-    }
-    api.get("/users", { params: { role: "employee", branch: branchId } }).then((res) => setEmployees(res.data));
-  }, [form.branch, modalOpen]);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, branch: user.role !== "super_admin" ? user.branch?._id || user.branch : "" });
+    setForm(emptyForm);
     setParticipants([]);
     setError("");
     setModalOpen(true);
@@ -55,7 +44,6 @@ const Competitions = () => {
       date: c.date?.slice(0, 10),
       prize: c.prize || "",
       notes: c.notes || "",
-      branch: c.branch?._id || c.branch || "",
     });
     setParticipants(c.participants.map((p) => ({ employee: p.employee?._id, score: p.score })));
     setError("");
@@ -77,10 +65,6 @@ const Competitions = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (user.role === "super_admin" && !form.branch) {
-      setError("من فضلك اختر الفرع");
-      return;
-    }
     try {
       const winner = participants.length
         ? participants.reduce((a, b) => (b.score > a.score ? b : a)).employee
@@ -145,17 +129,6 @@ const Competitions = () => {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "تعديل المسابقة" : "مسابقة جديدة"} wide>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
-          {user.role === "super_admin" && (
-            <div>
-              <label className="label">الفرع</label>
-              <select className="input" required value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value, employee: "" })}>
-                <option value="">اختر الفرع</option>
-                {branches.map((b) => (
-                  <option key={b._id} value={b._id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
           <div>
             <label className="label">عنوان المسابقة</label>
             <input className="input" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />

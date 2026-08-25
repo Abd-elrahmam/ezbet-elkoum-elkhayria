@@ -16,8 +16,8 @@ router.get("/", allowRoles(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER), async (req,
   }
   if (req.query.category) filter.category = req.query.category;
   if (req.query.month) {
-    const { start, end } = monthRange(req.query.month);
-    filter.date = { $gte: start, $lt: end };
+    const range = monthRange(req.query.month);
+    if (range) filter.date = { $gte: range.start, $lt: range.end };
   }
   const expenses = await Expense.find(filter).populate("branch", "name").sort({ date: -1 });
   res.json(expenses);

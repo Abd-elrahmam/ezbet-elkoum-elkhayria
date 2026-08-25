@@ -32,22 +32,22 @@ const Students = () => {
   const [filterDept, setFilterDept] = useState("");
   const [filterBranch, setFilterBranch] = useState("");
   const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState("name"); // name = أبجدي | added = بترتيب الإضافة
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [savingPhoto, setSavingPhoto] = useState(false);
 
-  const canEdit = true; // الأدمن ومدير الفرع والموظف كلهم يقدروا يضيفوا/يعدلوا (الموظف مقيد بطلابه فقط من الباك اند)
-  const canDelete = user.role !== "employee";
+  const canEdit = user.role !== "employee";
 
   const load = () => {
     setLoading(true);
-    const params = {};
+    const params = { sort: sortMode };
     if (filterDept) params.department = filterDept;
     if (filterBranch) params.branch = filterBranch;
     api.get("/students", { params }).then((res) => setStudents(res.data)).finally(() => setLoading(false));
   };
 
-  useEffect(load, [filterDept, filterBranch]);
+  useEffect(load, [filterDept, filterBranch, sortMode]);
 
   useEffect(() => {
     if (user.role === "super_admin") {
@@ -67,12 +67,7 @@ const Students = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({
-      ...emptyForm,
-      branch: user.role !== "super_admin" ? user.branch?._id || user.branch : "",
-      teacher: user.role === "employee" ? user._id : "",
-      department: user.role === "employee" && user.department !== "both" ? user.department : "nursery",
-    });
+    setForm({ ...emptyForm, branch: user.role !== "super_admin" ? user.branch?._id || user.branch : "" });
     setPhotoFile(null);
     setPhotoPreview("");
     setError("");
@@ -166,8 +161,8 @@ const Students = () => {
         <input className="input max-w-xs" placeholder="بحث بالاسم..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <select className="input max-w-[160px]" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
           <option value="">كل الأقسام</option>
-          <option value="nursery">الحضانة</option>
           <option value="quran">الكتاب</option>
+          <option value="nursery">الحضانة</option>
         </select>
         {user.role === "super_admin" && (
           <select className="input max-w-[200px]" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
@@ -177,6 +172,10 @@ const Students = () => {
             ))}
           </select>
         )}
+        <select className="input max-w-[190px]" value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
+          <option value="name">ترتيب أبجدي</option>
+          <option value="added">ترتيب الإضافة</option>
+        </select>
       </div>
 
       <div className="card overflow-x-auto">
@@ -186,7 +185,6 @@ const Students = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>#</th>
                 <th></th>
                 <th>الاسم</th>
                 <th>السن</th>
@@ -200,9 +198,8 @@ const Students = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s, idx) => (
+              {filtered.map((s) => (
                 <tr key={s._id}>
-                  <td className="text-sand-400">{idx + 1}</td>
                   <td>
                     {s.photoUrl ? (
                       <img src={resolveMediaUrl(s.photoUrl)} alt={s.name} className="w-9 h-9 rounded-full object-cover" />
@@ -226,9 +223,7 @@ const Students = () => {
                     <td>
                       <div className="flex gap-2">
                         <button className="btn-ghost" onClick={() => openEdit(s)}>تعديل</button>
-                        {canDelete && (
-                          <button className="btn-ghost text-red-500" onClick={() => setDeleteId(s._id)}>حذف</button>
-                        )}
+                        <button className="btn-ghost text-red-500" onClick={() => setDeleteId(s._id)}>حذف</button>
                       </div>
                     </td>
                   )}
@@ -236,7 +231,7 @@ const Students = () => {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="text-center text-sand-400 py-8">لا يوجد طلاب</td>
+                  <td colSpan={10} className="text-center text-sand-400 py-8">لا يوجد طلاب</td>
                 </tr>
               )}
             </tbody>
@@ -286,8 +281,8 @@ const Students = () => {
             <div>
               <label className="label">القسم</label>
               <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
-                <option value="nursery">الحضانة</option>
                 <option value="quran">الكتاب</option>
+                <option value="nursery">الحضانة</option>
               </select>
             </div>
             <div>

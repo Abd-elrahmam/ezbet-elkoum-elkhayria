@@ -18,8 +18,8 @@ router.get("/", async (req, res) => {
   if (req.query.student) filter.student = req.query.student;
   if (req.query.period) filter.period = req.query.period;
   if (req.query.month) {
-    const { start, end } = monthRange(req.query.month);
-    filter.date = { $gte: start, $lt: end };
+    const range = monthRange(req.query.month);
+    if (range) filter.date = { $gte: range.start, $lt: range.end };
   }
 
   const evaluations = await Evaluation.find(filter)

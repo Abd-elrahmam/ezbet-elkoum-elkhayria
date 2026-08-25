@@ -90,11 +90,6 @@ const Employees = () => {
     setPhotoPreview("");
   };
 
-  const toggleActive = async (u, active) => {
-    await api.put(`/users/${u._id}`, { active });
-    load();
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -169,20 +164,9 @@ const Employees = () => {
                   <td>{u.jobTitle || "—"}</td>
                   <td>{u.phone || "—"}</td>
                   <td>
-                    {u._id === user._id ? (
-                      <span className={`badge ${u.active ? "bg-primary-50 text-primary-700" : "bg-red-50 text-red-600"}`}>
-                        {u.active ? "نشط" : "متوقف"}
-                      </span>
-                    ) : (
-                      <select
-                        value={u.active ? "active" : "inactive"}
-                        onChange={(e) => toggleActive(u, e.target.value === "active")}
-                        className={`input !w-auto !py-1.5 !text-xs font-semibold ${u.active ? "!text-primary-700 !border-primary-200" : "!text-red-600 !border-red-200"}`}
-                      >
-                        <option value="active">نشط</option>
-                        <option value="inactive">متوقف</option>
-                      </select>
-                    )}
+                    <span className={`badge ${u.active ? "bg-primary-50 text-primary-700" : "bg-red-50 text-red-600"}`}>
+                      {u.active ? "نشط" : "متوقف"}
+                    </span>
                   </td>
                   <td>
                     <div className="flex gap-2">
@@ -230,12 +214,10 @@ const Employees = () => {
               <label className="label">اسم المستخدم</label>
               <input className="input" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} disabled={!!editing} />
             </div>
-            {(!editing || user.role === "super_admin") && (
-              <div>
-                <label className="label">{editing ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}</label>
-                <input className="input" type="password" required={!editing} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-              </div>
-            )}
+            <div>
+              <label className="label">{editing ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}</label>
+              <input className="input" type="password" required={!editing} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </div>
             <div>
               <label className="label">الهاتف</label>
               <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -264,9 +246,9 @@ const Employees = () => {
             <div>
               <label className="label">القسم</label>
               <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
-                <option value="both">الاثنين</option>
-                <option value="nursery">الحضانة</option>
                 <option value="quran">الكتاب</option>
+                <option value="nursery">الحضانة</option>
+                <option value="both">الاثنين</option>
               </select>
             </div>
             <div>

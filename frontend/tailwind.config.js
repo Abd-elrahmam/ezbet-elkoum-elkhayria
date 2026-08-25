@@ -4,8 +4,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Cairo", "Tahoma", "sans-serif" , "Aref Ruqaa"],
-        
+        sans: ["Cairo", "Tahoma", "sans-serif"],
       },
       colors: {
         primary: {

@@ -26,10 +26,13 @@ router.get("/", async (req, res) => {
   if (req.query.teacher) filter.teacher = req.query.teacher;
   if (req.user.role === ROLES.EMPLOYEE) filter.teacher = req.user._id; // المدرس يشوف طلابه فقط
 
+  // ترتيب النتائج: أبجدي بالاسم (الافتراضي) أو حسب ترتيب الإضافة (الأقدم فالأحدث)
+  const sortOption = req.query.sort === "added" ? { createdAt: 1 } : { name: 1 };
+
   const students = await Student.find(filter)
     .populate("branch", "name")
     .populate("teacher", "name")
-    .sort({ name: 1 });
+    .sort(sortOption);
   res.json(students);
 });
 
@@ -39,31 +42,27 @@ router.get("/:id", async (req, res) => {
   res.json(student);
 });
 
-// إضافة طالب: مسموح للأدمن ومدير الفرع والموظف (المدرس) كمان
 router.post("/", scopeToOwnBranch, async (req, res) => {
   try {
-    const payload = { ...req.body };
-    // لو موظف بيضيف طالب ومحددش مدرس، يبقى هو المدرس تلقائيًا (طالبه هو)
-    if (req.user.role === ROLES.EMPLOYEE && !payload.teacher) {
-      payload.teacher = req.user._id;
+    if (req.user.role === ROLES.EMPLOYEE) {
+      return res.status(403).json({ message: "ليس لديك صلاحية إضافة طلاب" });
     }
-    const student = await Student.create(payload);
+    const student = await Student.create(req.body);
     res.status(201).json(student);
   } catch (err) {
     res.status(400).json({ message: "فشل إضافة الطالب", error: err.message });
   }
 });
 
-// تعديل طالب: الأدمن ومدير الفرع لأي طالب في فرعه، والموظف لطلابه هو بس (المتوزعين عليه)
 router.put("/:id", scopeToOwnBranch, async (req, res) => {
   try {
+    if (req.user.role === ROLES.EMPLOYEE) {
+      return res.status(403).json({ message: "ليس لديك صلاحية تعديل بيانات الطلاب" });
+    }
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
     if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
       return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
-    }
-    if (req.user.role === ROLES.EMPLOYEE && student.teacher?.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "لا يمكنك تعديل طالب غير متوزع عليك" });
     }
     Object.assign(student, req.body);
     await student.save();
@@ -73,7 +72,6 @@ router.put("/:id", scopeToOwnBranch, async (req, res) => {
   }
 });
 
-// حذف طالب: الأدمن ومدير الفرع فقط
 router.delete("/:id", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) {
     return res.status(403).json({ message: "ليس لديك صلاحية حذف الطلاب" });
@@ -87,7 +85,7 @@ router.delete("/:id", async (req, res) => {
   res.json({ message: "تم حذف الطالب" });
 });
 
-// توزيع/إعادة توزيع طالب على مدرس معين: الأدمن ومدير الفرع فقط
+// توزيع/إعادة توزيع طالب على مدرس معين
 router.put("/:id/assign-teacher", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) {
     return res.status(403).json({ message: "ليس لديك صلاحية توزيع الطلاب" });
@@ -103,16 +101,16 @@ router.put("/:id/assign-teacher", async (req, res) => {
   res.json(student);
 });
 
-// رفع صورة الطالب: الأدمن ومدير الفرع، والموظف لطلابه هو بس
+// رفع صورة الطالب
 router.put("/:id/photo", upload.single("photo"), async (req, res) => {
+  if (req.user.role === ROLES.EMPLOYEE) {
+    return res.status(403).json({ message: "ليس لديك صلاحية تعديل صورة الطالب" });
+  }
   if (!req.file) return res.status(400).json({ message: "لم يتم إرسال أي صورة" });
   const student = await Student.findById(req.params.id);
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
   if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
-  }
-  if (req.user.role === ROLES.EMPLOYEE && student.teacher?.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ message: "لا يمكنك تعديل طالب غير متوزع عليك" });
   }
   deleteOldPhoto(student.photoUrl);
   student.photoUrl = `/uploads/${req.file.filename}`;
@@ -120,15 +118,15 @@ router.put("/:id/photo", upload.single("photo"), async (req, res) => {
   res.json(student);
 });
 
-// حذف صورة الطالب: الأدمن ومدير الفرع، والموظف لطلابه هو بس
+// حذف صورة الطالب
 router.delete("/:id/photo", async (req, res) => {
+  if (req.user.role === ROLES.EMPLOYEE) {
+    return res.status(403).json({ message: "ليس لديك صلاحية تعديل صورة الطالب" });
+  }
   const student = await Student.findById(req.params.id);
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
   if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
-  }
-  if (req.user.role === ROLES.EMPLOYEE && student.teacher?.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ message: "لا يمكنك تعديل طالب غير متوزع عليك" });
   }
   deleteOldPhoto(student.photoUrl);
   student.photoUrl = "";

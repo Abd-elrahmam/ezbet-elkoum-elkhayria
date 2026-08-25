@@ -19,8 +19,8 @@ router.get("/", async (req, res) => {
   if (req.query.type) filter.type = req.query.type;
   if (req.user.role === ROLES.EMPLOYEE) filter.examiner = req.user._id;
   if (req.query.month) {
-    const { start, end } = monthRange(req.query.month);
-    filter.date = { $gte: start, $lt: end };
+    const range = monthRange(req.query.month);
+    if (range) filter.date = { $gte: range.start, $lt: range.end };
   }
 
   const tests = await Test.find(filter)

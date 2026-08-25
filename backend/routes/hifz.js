@@ -1,29 +1,12 @@
 const express = require("express");
 const Hifz = require("../models/Hifz");
-const Student = require("../models/Student");
-const MonthlyAttendance = require("../models/MonthlyAttendance");
+const MonthlyAttendanceSummary = require("../models/MonthlyAttendanceSummary");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
+const { computePagesRangeByName } = require("../utils/quranPages");
 
 const router = express.Router();
 router.use(protect);
-
-// يتأكد إن سجل الحفظ ده خاص بموظف معين: إما هو اللي سجله، أو الطالب متوزع عليه
-const isOwnedByEmployee = async (record, employeeId) => {
-  if (record.recordedBy?.toString() === employeeId.toString()) return true;
-  if (record.employee?.toString() === employeeId.toString()) return true;
-  if (record.student) {
-    const student = await Student.findById(record.student).select("teacher");
-    if (student?.teacher?.toString() === employeeId.toString()) return true;
-  }
-  return false;
-};
-
-// يجيب عدد أيام الحضور المسجلة لنفس الطالب/الموظف ونفس الشهر (تلقائيًا من سجل الحضور الشهري)
-const getAttendedDays = async (student, employee, month) => {
-  const record = await MonthlyAttendance.findOne(student ? { student, month } : { employee, month });
-  return record?.presentDays || 0;
-};
 
 router.get("/", async (req, res) => {
   const filter = {};
@@ -32,13 +15,7 @@ router.get("/", async (req, res) => {
   } else {
     filter.branch = req.user.branch;
   }
-
-  if (req.user.role === ROLES.EMPLOYEE) {
-    // الموظف يشوف: سجلات حفظه هو + كل سجلات الحفظ بتاعة طلابه المتوزعين عليه
-    const myStudents = await Student.find({ teacher: req.user._id }).select("_id");
-    const myStudentIds = myStudents.map((s) => s._id);
-    filter.$or = [{ employee: req.user._id }, { student: { $in: myStudentIds } }];
-  }
+  if (req.query.department) filter.department = req.query.department;
   if (req.query.student) filter.student = req.query.student;
   if (req.query.employee) filter.employee = req.query.employee;
   if (req.query.month) filter.month = req.query.month;
@@ -46,63 +23,83 @@ router.get("/", async (req, res) => {
   const records = await Hifz.find(filter)
     .populate("student", "name")
     .populate("employee", "name")
-    .populate("branch", "name")
-    .sort({ month: -1, createdAt: -1 });
+    .populate("teacher", "name");
   res.json(records);
 });
 
-router.post("/", scopeToOwnBranch, async (req, res) => {
+// حفظ جماعي (أو سجل واحد جوه مصفوفة من عنصر واحد) لصفحة تسجيل الحفظ الشهري
+router.post("/bulk", scopeToOwnBranch, async (req, res) => {
   try {
-    const { student, employee, month } = req.body;
-    if (!student && !employee) {
-      return res.status(400).json({ message: "لازم تحدد طالب أو موظف" });
+    const { records } = req.body;
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ message: "لا توجد سجلات لحفظها" });
     }
-    // الموظف يقدر يسجل حفظ لطلابه هو بس (المتوزعين عليه)
-    if (req.user.role === ROLES.EMPLOYEE && student) {
-      const targetStudent = await Student.findById(student).select("teacher");
-      if (targetStudent?.teacher?.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ message: "لا يمكنك تسجيل حفظ لطالب غير متوزع عليك" });
-      }
-    }
-    const existing = await Hifz.findOne(student ? { student, month } : { employee, month });
-    if (existing) {
-      return res.status(400).json({ message: "يوجد سجل حفظ بالفعل لنفس الشهر، عدّل السجل الموجود بدل إضافة سجل جديد" });
-    }
-    const attendedDays = await getAttendedDays(student, employee, month);
-    const record = await Hifz.create({ ...req.body, attendedDays, recordedBy: req.user._id });
-    res.status(201).json(record);
+    const branch = req.user.role === ROLES.SUPER_ADMIN ? null : req.user.branch;
+
+    const results = await Promise.all(
+      records.map(async (r) => {
+        // أيام الحضور: من الطلب، أو تُسحب من ملخص الحضور الشهري (لو الشهر بصيغة YYYY-MM)
+        let presentDays = r.presentDays != null ? Number(r.presentDays) : null;
+        if (presentDays == null && r.student && r.month) {
+          const [y, m] = String(r.month).split("-").map(Number);
+          if (y && m) {
+            const summary = await MonthlyAttendanceSummary.findOne({ student: r.student, month: m, year: y });
+            presentDays = summary ? summary.presentDays : null;
+          }
+        }
+
+        const status = r.status || "normal";
+        const dailyRatePages = r.dailyRatePages != null ? Number(r.dailyRatePages) : null;
+        const expectedPages =
+          status !== "normal"
+            ? 0
+            : dailyRatePages == null || presentDays == null
+            ? null
+            : Math.round(dailyRatePages * presentDays * 100) / 100;
+
+        const memCalc = status === "normal"
+          ? computePagesRangeByName(r.memFromSurah, r.memFromAyah, r.memToSurah, r.memToAyah)
+          : { pagesCount: 0 };
+        const revCalc = computePagesRangeByName(r.revFromSurah, r.revFromAyah, r.revToSurah, r.revToAyah);
+
+        const query = r.student ? { student: r.student, month: r.month } : { employee: r.employee, month: r.month };
+
+        return Hifz.findOneAndUpdate(
+          query,
+          {
+            student: r.student || null,
+            employee: r.employee || null,
+            branch: branch || r.branch,
+            department: r.department || "quran",
+            teacher: r.teacher || null,
+            month: r.month,
+            status,
+            dailyRatePages,
+            presentDays,
+            expectedPages,
+            memFromSurah: status === "normal" ? r.memFromSurah || "" : "",
+            memFromAyah: status === "normal" ? r.memFromAyah || null : null,
+            memToSurah: status === "normal" ? r.memToSurah || "" : "",
+            memToAyah: status === "normal" ? r.memToAyah || null : null,
+            totalMemPages: memCalc.pagesCount || 0,
+            revFromSurah: r.revFromSurah || "",
+            revFromAyah: r.revFromAyah || null,
+            revToSurah: r.revToSurah || "",
+            revToAyah: r.revToAyah || null,
+            totalRevisionPages: revCalc.pagesCount || 0,
+            mutoonFrom: r.mutoonFrom || "",
+            mutoonTo: r.mutoonTo || "",
+            grade: r.grade || null,
+            notes: r.notes || "",
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      })
+    );
+    res.status(201).json(results);
   } catch (err) {
-    res.status(400).json({ message: "فشل تسجيل الحفظ", error: err.message });
+    res.status(400).json({ message: "فشل حفظ سجلات الحفظ", error: err.message });
   }
-});
-
-router.put("/:id", async (req, res) => {
-  const record = await Hifz.findById(req.params.id);
-  if (!record) return res.status(404).json({ message: "السجل غير موجود" });
-  if (req.user.role !== ROLES.SUPER_ADMIN && record.branch.toString() !== req.user.branch.toString()) {
-    return res.status(403).json({ message: "لا يمكنك تعديل سجل من فرع آخر" });
-  }
-  if (req.user.role === ROLES.EMPLOYEE && !(await isOwnedByEmployee(record, req.user._id))) {
-    return res.status(403).json({ message: "لا يمكنك تعديل هذا السجل" });
-  }
-  Object.assign(record, req.body);
-  // إعادة حساب أيام الحضور من سجل الحضور الحالي (تحديث تلقائي)
-  record.attendedDays = await getAttendedDays(record.student, record.employee, record.month);
-  await record.save();
-  res.json(record);
-});
-
-router.delete("/:id", async (req, res) => {
-  const record = await Hifz.findById(req.params.id);
-  if (!record) return res.status(404).json({ message: "السجل غير موجود" });
-  if (req.user.role !== ROLES.SUPER_ADMIN && record.branch.toString() !== req.user.branch.toString()) {
-    return res.status(403).json({ message: "لا يمكنك حذف سجل من فرع آخر" });
-  }
-  if (req.user.role === ROLES.EMPLOYEE && !(await isOwnedByEmployee(record, req.user._id))) {
-    return res.status(403).json({ message: "لا يمكنك حذف هذا السجل" });
-  }
-  await record.deleteOne();
-  res.json({ message: "تم حذف السجل" });
 });
 
 module.exports = router;

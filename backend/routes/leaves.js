@@ -17,7 +17,6 @@ router.get("/", async (req, res) => {
     filter.branch = req.query.branch;
   }
   if (req.query.status) filter.status = req.query.status;
-  if (req.query.employee && req.user.role !== ROLES.EMPLOYEE) filter.employee = req.query.employee;
 
   const requests = await LeaveRequest.find(filter)
     .populate("employee", "name jobTitle")
@@ -44,40 +43,6 @@ router.post("/", async (req, res) => {
     res.status(201).json(request);
   } catch (err) {
     res.status(400).json({ message: "فشل تقديم الطلب", error: err.message });
-  }
-});
-
-// تعديل بيانات الطلب (تواريخ وسبب): صاحب الطلب لو لسه معلّق، أو مدير الفرع/الأدمن دايمًا
-router.put("/:id", async (req, res) => {
-  try {
-    const request = await LeaveRequest.findById(req.params.id);
-    if (!request) return res.status(404).json({ message: "الطلب غير موجود" });
-
-    const isOwner = request.employee.toString() === req.user._id.toString();
-    const isAdmin = req.user.role === ROLES.SUPER_ADMIN;
-    const isManagerOfBranch =
-      req.user.role === ROLES.BRANCH_MANAGER && request.branch.toString() === req.user.branch.toString();
-
-    if (!isAdmin && !isManagerOfBranch && !(isOwner && request.status === "pending")) {
-      return res.status(403).json({ message: "لا يمكنك تعديل هذا الطلب" });
-    }
-
-    const { startDate, endDate, reason, status } = req.body;
-    if (startDate) request.startDate = startDate;
-    if (endDate) request.endDate = endDate;
-    if (reason !== undefined) request.reason = reason;
-
-    // تغيير الحالة مسموح للأدمن الرئيسي أو مدير الفرع بتاع الطلب بس
-    if (status && ["pending", "approved", "rejected"].includes(status) && (isAdmin || isManagerOfBranch)) {
-      request.status = status;
-      request.reviewedBy = req.user._id;
-      request.reviewedAt = new Date();
-    }
-
-    await request.save();
-    res.json(request);
-  } catch (err) {
-    res.status(400).json({ message: "فشل تعديل الطلب", error: err.message });
   }
 });
 

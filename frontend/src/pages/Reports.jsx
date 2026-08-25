@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
-import { formatPages } from "../utils/quran";
+import { formatPagesOrJuz } from "../utils/quran";
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -337,11 +337,11 @@ const Reports = () => {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-primary-50 rounded-xl px-3 py-2 text-center">
                           <p className="text-xs text-primary-600 mb-1">📖 إجمالي الحفظ الجديد</p>
-                          <p className="text-lg font-extrabold text-primary-700">{formatPages(report.hifz.totalMemPages)}</p>
+                          <p className="text-lg font-extrabold text-primary-700">{formatPagesOrJuz(report.hifz.totalMemPages)}</p>
                         </div>
                         <div className="bg-sand-100 rounded-xl px-3 py-2 text-center">
                           <p className="text-xs text-sand-500 mb-1">🔄 إجمالي المراجعة</p>
-                          <p className="text-lg font-extrabold text-sand-700">{formatPages(report.hifz.totalRevisionPages)}</p>
+                          <p className="text-lg font-extrabold text-sand-700">{formatPagesOrJuz(report.hifz.totalRevisionPages)}</p>
                         </div>
                       </div>
                       {memRange(report.hifz) && (

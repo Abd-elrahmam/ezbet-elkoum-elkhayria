@@ -27,7 +27,6 @@ const Evaluations = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState(null);
   const [error, setError] = useState("");
@@ -46,24 +45,7 @@ const Evaluations = () => {
   }, []);
 
   const openCreate = () => {
-    setEditing(null);
     setForm(emptyForm);
-    setError("");
-    setModalOpen(true);
-  };
-
-  const openEdit = (ev) => {
-    setEditing(ev);
-    setForm({
-      student: ev.student?._id || "",
-      period: ev.period,
-      rating: String(ev.rating),
-      memorization: ev.memorization ? String(ev.memorization) : "",
-      behavior: ev.behavior ? String(ev.behavior) : "",
-      participation: ev.participation ? String(ev.participation) : "",
-      notes: ev.notes || "",
-      date: ev.date?.slice(0, 10) || new Date().toISOString().slice(0, 10),
-    });
     setError("");
     setModalOpen(true);
   };
@@ -82,11 +64,7 @@ const Evaluations = () => {
         branch: student?.branch?._id || student?.branch,
         department: student?.department,
       };
-      if (editing) {
-        await api.put(`/evaluations/${editing._id}`, payload);
-      } else {
-        await api.post("/evaluations", payload);
-      }
+      await api.post("/evaluations", payload);
       setModalOpen(false);
       load();
     } catch (err) {
@@ -141,10 +119,7 @@ const Evaluations = () => {
                   <td>{ev.date?.slice(0, 10)}</td>
                   <td className="text-sand-500">{ev.notes || "—"}</td>
                   <td>
-                    <div className="flex gap-2">
-                      <button className="btn-ghost" onClick={() => openEdit(ev)}>تعديل</button>
-                      <button className="btn-ghost text-red-500" onClick={() => setDeleteId(ev._id)}>حذف</button>
-                    </div>
+                    <button className="btn-ghost text-red-500" onClick={() => setDeleteId(ev._id)}>حذف</button>
                   </td>
                 </tr>
               ))}
@@ -156,7 +131,7 @@ const Evaluations = () => {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "تعديل تقييم الطالب" : "إضافة تقييم للطالب"} wide>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="إضافة تقييم للطالب" wide>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
           <div className="grid grid-cols-2 gap-4">
@@ -217,7 +192,7 @@ const Evaluations = () => {
             <label className="label">ملاحظات</label>
             <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
-          <button className="btn-primary w-full justify-center">{editing ? "حفظ التعديلات" : "حفظ التقييم"}</button>
+          <button className="btn-primary w-full justify-center">حفظ التقييم</button>
         </form>
       </Modal>
 

@@ -1,214 +1,343 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
-import Modal from "../components/Modal";
-import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
+import { usePeriod, MONTH_NAMES } from "../context/PeriodContext";
 
-const currentMonth = () => new Date().toISOString().slice(0, 7);
+const MONTH_TOTAL_DAYS = 20;
 
-const emptyForm = {
-  student: "",
-  month: currentMonth(),
-  presentDays: "",
-  absentDays: "",
-  lateDays: "0",
-  excusedDays: "0",
-  notes: "",
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+const STATUS_LABELS = {
+  present: "حاضر",
+  absent: "غائب",
+  late: "متأخر",
+  excused: "مُعتذر",
+};
+const STATUS_COLORS = {
+  present: "bg-primary-50 text-primary-700",
+  absent: "bg-red-50 text-red-600",
+  late: "bg-amber-50 text-amber-600",
+  excused: "bg-sand-100 text-sand-700",
 };
 
-// صفحة الحضور والغياب الشهري - خاصة بالطلاب فقط
-// (الموظفين لهم صفحة منفصلة "حضور الموظفين" يومية)
 const Attendance = () => {
   const { user } = useAuth();
-  const canManage = user.role !== "employee"; // الأدمن ومدير الفرع بس يقدروا يعدلوا/يحذفوا
-  const [records, setRecords] = useState([]);
+  const { activeMonth, activeYear, isCustom } = usePeriod();
+
+  const [tab, setTab] = useState("daily"); // daily | monthly
+  const [department, setDepartment] = useState("nursery");
+  const [branches, setBranches] = useState([]);
+  const [filterBranch, setFilterBranch] = useState("");
+  const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState("name"); // name | added
+
   const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyForm);
-  const [deleteId, setDeleteId] = useState(null);
-  const [error, setError] = useState("");
-  const [filterMonth, setFilterMonth] = useState("");
 
-  const load = () => {
-    setLoading(true);
-    const params = {};
-    if (filterMonth) params.month = filterMonth;
-    api.get("/monthly-attendance", { params }).then((res) => setRecords(res.data.filter((r) => r.student))).finally(() => setLoading(false));
-  };
+  // تبويب الحضور اليومي
+  const [date, setDate] = useState(todayStr());
+  const [records, setRecords] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
-  useEffect(load, [filterMonth]);
+  // تبويب الملخص الشهري
+  const [month, setMonth] = useState(activeMonth);
+  const [year, setYear] = useState(activeYear);
+  const [summary, setSummary] = useState({}); // studentId -> { presentDays, absentDays }
+  const [savingSummary, setSavingSummary] = useState(false);
+  const [summaryMessage, setSummaryMessage] = useState("");
+  const [monthTouched, setMonthTouched] = useState(false);
+
+  // لو المستخدم غيّر الشهر المعتمد من الأيقونة العلوية ولسه ما لمسش
+  // الفورم بإيده، يتحدّث الشهر/السنة هنا تلقائيًا
   useEffect(() => {
-    // الموظف هيشوف طلابه هو بس تلقائيًا (الباك اند بيقيدها)
-    api.get("/students").then((res) => setStudents(res.data));
-  }, []);
+    if (!monthTouched) {
+      setMonth(activeMonth);
+      setYear(activeYear);
+    }
+  }, [activeMonth, activeYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm(emptyForm);
-    setError("");
-    setModalOpen(true);
-  };
+  useEffect(() => {
+    if (user.role === "super_admin") {
+      api.get("/branches").then((res) => setBranches(res.data));
+    }
+  }, [user.role]);
 
-  const openEdit = (r) => {
-    setEditing(r);
-    setForm({
-      student: r.student?._id || "",
-      month: r.month,
-      presentDays: r.presentDays,
-      absentDays: r.absentDays,
-      lateDays: r.lateDays || 0,
-      excusedDays: r.excusedDays || 0,
-      notes: r.notes || "",
+  useEffect(() => {
+    const params = { department, sort: sortMode };
+    if (filterBranch) params.branch = filterBranch;
+    api.get("/students", { params }).then((res) => setStudents(res.data));
+  }, [department, filterBranch, sortMode]);
+
+  useEffect(() => {
+    if (tab !== "daily") return;
+    const params = { department, date };
+    if (filterBranch) params.branch = filterBranch;
+    api.get("/attendance", { params }).then((res) => {
+      const map = {};
+      res.data.forEach((r) => {
+        if (r.student) map[r.student._id] = r.status;
+      });
+      setRecords(map);
     });
-    setError("");
-    setModalOpen(true);
+  }, [department, date, students.length, tab, filterBranch]);
+
+  useEffect(() => {
+    if (tab !== "monthly") return;
+    const params = { department, month, year };
+    if (filterBranch) params.branch = filterBranch;
+    api.get("/monthly-attendance", { params }).then((res) => {
+      const map = {};
+      res.data.forEach((r) => {
+        if (r.student) map[r.student._id || r.student] = { presentDays: r.presentDays, absentDays: r.absentDays };
+      });
+      setSummary(map);
+    });
+  }, [department, month, year, students.length, tab, filterBranch]);
+
+  const setStatus = (studentId, status) => {
+    setRecords((prev) => ({ ...prev, [studentId]: status }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
+  const handleSaveAll = async () => {
+    setSaving(true);
+    setMessage("");
     try {
-      const studentObj = students.find((s) => s._id === form.student);
-
-      const payload = {
-        student: form.student,
-        branch: studentObj?.branch?._id || studentObj?.branch,
-        department: studentObj?.department,
-        month: form.month,
-        presentDays: Number(form.presentDays),
-        absentDays: Number(form.absentDays),
-        lateDays: Number(form.lateDays) || 0,
-        excusedDays: Number(form.excusedDays) || 0,
-        notes: form.notes,
-      };
-
-      if (editing) {
-        await api.put(`/monthly-attendance/${editing._id}`, payload);
-      } else {
-        await api.post("/monthly-attendance", payload);
-      }
-      setModalOpen(false);
-      load();
+      const payload = students.map((s) => ({
+        student: s._id,
+        branch: s.branch?._id || s.branch,
+        department,
+        date,
+        status: records[s._id] || "present",
+      }));
+      await api.post("/attendance/bulk", { records: payload });
+      setMessage("تم حفظ الحضور بنجاح ✅");
     } catch (err) {
-      setError(err.response?.data?.message || "حدث خطأ");
+      setMessage(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    await api.delete(`/monthly-attendance/${deleteId}`);
-    load();
+  // تعديل الحضور أو الغياب بيحسب التاني تلقائي (المجموع = 20 يوم)
+  const setSummaryField = (studentId, field, value) => {
+    let num = value === "" ? "" : Math.max(0, Math.min(MONTH_TOTAL_DAYS, Number(value)));
+    setSummary((prev) => {
+      const other = field === "presentDays" ? "absentDays" : "presentDays";
+      const otherVal = num === "" ? "" : MONTH_TOTAL_DAYS - num;
+      return { ...prev, [studentId]: { ...prev[studentId], [field]: num, [other]: otherVal } };
+    });
   };
+
+  const handleSaveSummary = async () => {
+    setSavingSummary(true);
+    setSummaryMessage("");
+    try {
+      const payload = students.map((s) => {
+        const rec = summary[s._id] || {};
+        const present = rec.presentDays === "" || rec.presentDays == null ? 0 : rec.presentDays;
+        const absent = rec.absentDays === "" || rec.absentDays == null ? MONTH_TOTAL_DAYS - present : rec.absentDays;
+        return {
+          student: s._id,
+          branch: s.branch?._id || s.branch,
+          department,
+          month,
+          year,
+          presentDays: present,
+          absentDays: absent,
+        };
+      });
+      await api.post("/monthly-attendance/bulk", { records: payload });
+      setSummaryMessage("تم حفظ ملخص الحضور الشهري بنجاح ✅");
+    } catch (err) {
+      setSummaryMessage(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
+    } finally {
+      setSavingSummary(false);
+    }
+  };
+
+  const filteredStudents = useMemo(
+    () => students.filter((s) => s.name.toLowerCase().includes(search.toLowerCase())),
+    [students, search]
+  );
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-sand-900">الحضور والغياب الشهري (الطلاب)</h1>
-        <button className="btn-primary" onClick={openCreate}>+ إضافة سجل حضور</button>
-      </div>
-
-      {!canManage && (
-        <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">
-          تقدر تضيف سجلات حضور جديدة لطلابك، لكن التعديل والحذف متاحين لمدير الفرع أو الأدمن فقط.
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h1 className="text-2xl font-bold text-sand-900">الحضور والغياب</h1>
+        <div className="flex gap-2 bg-sand-100 rounded-xl p-1">
+          <button
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition ${tab === "daily" ? "bg-white shadow-sm text-primary-700" : "text-sand-500"}`}
+            onClick={() => setTab("daily")}
+          >
+            كشف يومي
+          </button>
+          <button
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition ${tab === "monthly" ? "bg-white shadow-sm text-primary-700" : "text-sand-500"}`}
+            onClick={() => setTab("monthly")}
+          >
+            ملخص شهري
+          </button>
         </div>
-      )}
-
-      <div className="flex gap-3 mb-4">
-        <input type="month" className="input max-w-[180px]" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} />
       </div>
 
-      <div className="card overflow-x-auto">
-        {loading ? (
-          <p className="text-sand-500 p-4">جارِ التحميل...</p>
+      <div className="flex flex-wrap gap-3 mb-4 items-center">
+        <select className="input max-w-[160px]" value={department} onChange={(e) => setDepartment(e.target.value)}>
+          <option value="quran">الكتاب</option>
+          <option value="nursery">الحضانة</option>
+        </select>
+
+        {user.role === "super_admin" && (
+          <select className="input max-w-[200px]" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
+            <option value="">كل الفروع</option>
+            {branches.map((b) => (
+              <option key={b._id} value={b._id}>{b.name}</option>
+            ))}
+          </select>
+        )}
+
+        <input className="input max-w-xs" placeholder="بحث بالاسم..." value={search} onChange={(e) => setSearch(e.target.value)} />
+
+        <select className="input max-w-[190px]" value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
+          <option value="name">ترتيب أبجدي</option>
+          <option value="added">ترتيب الإضافة</option>
+        </select>
+
+        {tab === "daily" ? (
+          <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>اسم الطالب</th>
-                <th>الشهر</th>
-                <th>أيام الحضور</th>
-                <th>أيام الغياب</th>
-                <th>تأخير</th>
-                <th>عذر</th>
-                {canManage && <th></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((r) => (
-                <tr key={r._id}>
-                  <td className="font-semibold">{r.student?.name}</td>
-                  <td>{r.month}</td>
-                  <td className="text-primary-700 font-bold">{r.presentDays}</td>
-                  <td className="text-red-600 font-bold">{r.absentDays}</td>
-                  <td>{r.lateDays || 0}</td>
-                  <td>{r.excusedDays || 0}</td>
-                  {canManage && (
-                    <td>
-                      <div className="flex gap-2">
-                        <button className="btn-ghost" onClick={() => openEdit(r)}>تعديل</button>
-                        <button className="btn-ghost text-red-500" onClick={() => setDeleteId(r._id)}>حذف</button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
+          <div className="flex gap-2 items-center">
+            <select
+              className="input"
+              value={month}
+              onChange={(e) => { setMonth(Number(e.target.value)); setMonthTouched(true); }}
+            >
+              {MONTH_NAMES.map((m, i) => (
+                <option key={i + 1} value={i + 1}>{m}</option>
               ))}
-              {records.length === 0 && (
-                <tr><td colSpan={7} className="text-center text-sand-400 py-8">لا توجد سجلات حضور بعد</td></tr>
-              )}
-            </tbody>
-          </table>
+            </select>
+            <input
+              type="number"
+              className="input w-24"
+              value={year}
+              onChange={(e) => { setYear(Number(e.target.value)); setMonthTouched(true); }}
+            />
+            {isCustom && !monthTouched && (
+              <span className="text-xs text-primary-700 bg-primary-50 rounded-full px-2 py-1">مأخوذ من الشهر المحدد أعلى الصفحة</span>
+            )}
+          </div>
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "تعديل سجل الحضور" : "إضافة سجل حضور شهري"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
-
-          <div>
-            <label className="label">الطالب</label>
-            <select className="input" required disabled={!!editing} value={form.student} onChange={(e) => setForm({ ...form, student: e.target.value })}>
-              <option value="">اختر الطالب</option>
-              {students.map((s) => (
-                <option key={s._id} value={s._id}>{s.name}</option>
-              ))}
-            </select>
+      {tab === "daily" && (
+        <>
+          {message && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{message}</div>}
+          <div className="card overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>اسم الطالب</th>
+                  <th>المدرس</th>
+                  <th>الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.map((s) => (
+                  <tr key={s._id}>
+                    <td className="font-semibold">{s.name}</td>
+                    <td>{s.teacher?.name || "—"}</td>
+                    <td>
+                      <div className="flex gap-1 flex-wrap">
+                        {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setStatus(s._id, key)}
+                            className={`badge cursor-pointer border ${
+                              (records[s._id] || "present") === key
+                                ? STATUS_COLORS[key] + " border-transparent"
+                                : "bg-white text-sand-400 border-sand-200"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredStudents.length === 0 && (
+                  <tr><td colSpan={3} className="text-center text-sand-400 py-8">لا يوجد طلاب مطابقين</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
 
-          <div>
-            <label className="label">الشهر</label>
-            <input className="input" type="month" required disabled={!!editing} value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} />
+          {filteredStudents.length > 0 && (
+            <button className="btn-primary mt-4" onClick={handleSaveAll} disabled={saving}>
+              {saving ? "جارِ الحفظ..." : "حفظ الحضور"}
+            </button>
+          )}
+        </>
+      )}
+
+      {tab === "monthly" && (
+        <>
+          <p className="text-xs text-sand-400 mb-3">
+            الشهر معتمد كـ 20 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 20).
+          </p>
+          {summaryMessage && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{summaryMessage}</div>}
+          <div className="card overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>اسم الطالب</th>
+                  <th>أيام الحضور</th>
+                  <th>أيام الغياب</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.map((s) => {
+                  const rec = summary[s._id] || {};
+                  return (
+                    <tr key={s._id}>
+                      <td className="font-semibold">{s.name}</td>
+                      <td>
+                        <input
+                          type="number"
+                          min={0}
+                          max={MONTH_TOTAL_DAYS}
+                          className="input w-24"
+                          value={rec.presentDays ?? ""}
+                          onChange={(e) => setSummaryField(s._id, "presentDays", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min={0}
+                          max={MONTH_TOTAL_DAYS}
+                          className="input w-24"
+                          value={rec.absentDays ?? ""}
+                          onChange={(e) => setSummaryField(s._id, "absentDays", e.target.value)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredStudents.length === 0 && (
+                  <tr><td colSpan={3} className="text-center text-sand-400 py-8">لا يوجد طلاب مطابقين</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">عدد أيام الحضور</label>
-              <input className="input" type="number" min={0} required value={form.presentDays} onChange={(e) => setForm({ ...form, presentDays: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">عدد أيام الغياب</label>
-              <input className="input" type="number" min={0} required value={form.absentDays} onChange={(e) => setForm({ ...form, absentDays: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">أيام التأخير (اختياري)</label>
-              <input className="input" type="number" min={0} value={form.lateDays} onChange={(e) => setForm({ ...form, lateDays: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">أيام بعذر (اختياري)</label>
-              <input className="input" type="number" min={0} value={form.excusedDays} onChange={(e) => setForm({ ...form, excusedDays: e.target.value })} />
-            </div>
-          </div>
-
-          <div>
-            <label className="label">ملاحظات</label>
-            <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </div>
-
-          <button className="btn-primary w-full justify-center">{editing ? "حفظ التعديلات" : "حفظ السجل"}</button>
-        </form>
-      </Modal>
-
-      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} message="سيتم حذف سجل الحضور. هل أنت متأكد؟" />
+          {filteredStudents.length > 0 && (
+            <button className="btn-primary mt-4" onClick={handleSaveSummary} disabled={savingSummary}>
+              {savingSummary ? "جارِ الحفظ..." : "حفظ الملخص الشهري"}
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 };

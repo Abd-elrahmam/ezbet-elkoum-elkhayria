@@ -4,23 +4,23 @@ import { useAuth, ROLE_LABELS } from "../context/AuthContext";
 import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
 import Footer from "./Footer";
 import FloatingWhatsApp from "./FloatingWhatsApp";
+import PeriodPicker from "./PeriodPicker";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "لوحة التحكم", icon: "🏠", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/branches", label: "الفروع", icon: "🏢", roles: ["super_admin"] },
   { to: "/students", label: "الطلاب", icon: "🎓", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/employees", label: "الموظفون", icon: "👥", roles: ["super_admin", "branch_manager"] },
-  { to: "/attendance", label: "حضور الطلاب (شهري)", icon: "📋", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/employee-attendance", label: "حضور الموظفين (يومي)", icon: "🗓️", roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/attendance", label: "الحضور والغياب", icon: "📋", roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/memorization", label: "تسجيل الحفظ الشهري", icon: "📖", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/tests", label: "الاختبارات", icon: "📝", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/evaluations", label: "تقييم الطلاب", icon: "⭐", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/hifz", label: "الحفظ الشهري", icon: "📖", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/competitions", label: "مسابقات الموظفين", icon: "🏆", roles: ["super_admin", "branch_manager"] },
   { to: "/leaves", label: "طلبات الإجازة", icon: "🗓️", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/payments", label: "المدفوعات", icon: "💵", roles: ["super_admin", "branch_manager"] },
   { to: "/expenses", label: "المصروفات", icon: "🧾", roles: ["super_admin", "branch_manager"] },
   { to: "/salaries", label: "الرواتب", icon: "💰", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/reports", label: "التقارير", icon: "🖨️", roles: ["super_admin", "branch_manager"] },
+  { to: "/reports", label: "التقارير", icon: "📊", roles: ["super_admin", "branch_manager"] },
   { to: "/settings", label: "إعدادات الموقع", icon: "⚙️", roles: ["super_admin"] },
 ];
 
@@ -39,10 +39,10 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-sand-50 print:bg-white" dir="rtl">
-      {/* الشريط الجانبي - ثابت في مكانه (fixed) بارتفاع الشاشة، وقائمة الروابط جواه بس هي اللي بتسكرول */}
+    <div className="h-screen bg-sand-50 flex overflow-hidden" dir="rtl">
+      {/* الشريط الجانبي - ثابت بالكامل، السكرول بس في قائمة الروابط */}
       <aside
-        className={`print:hidden fixed z-30 inset-y-0 right-0 w-64 h-screen bg-white border-l border-sand-100 flex flex-col transition-transform duration-200 ${
+        className={`fixed lg:static z-30 inset-y-0 right-0 w-64 h-screen bg-white border-l border-sand-100 flex flex-col transition-transform duration-200 ${
           sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
         }`}
       >
@@ -57,7 +57,7 @@ const Layout = ({ children }) => {
           </div>
         </Link>
 
-        {/* قائمة الروابط - المنطقة الوحيدة القابلة للسكرول في كل التخطيط */}
+        {/* قائمة الروابط - المنطقة الوحيدة القابلة للسكرول في السايدبار */}
         <nav className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1">
           {visibleItems.map((item) => (
             <NavLink
@@ -100,33 +100,33 @@ const Layout = ({ children }) => {
         <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* المحتوى - بيبدأ بعد مساحة السايدبار الثابت، وبيسكرول مع الصفحة كلها بشكل طبيعي */}
-      <div className="lg:mr-64 print:mr-0 min-h-screen flex flex-col">
-        <header className="print:hidden lg:hidden bg-white border-b border-sand-100 p-4 flex items-center justify-between">
+      {/* المحتوى - عمود مستقل بارتفاع الشاشة، المحتوى نفسه بيسكرول والفوتر ثابت تحت */}
+      <div className="flex-1 min-w-0 h-screen flex flex-col overflow-hidden">
+        <header className="lg:hidden bg-white border-b border-sand-100 p-4 flex items-center justify-between flex-shrink-0">
           <button onClick={() => setSidebarOpen(true)} className="btn-ghost">
             ☰ القائمة
           </button>
           <div className="font-bold text-sand-800">{settings?.heroTitle || "جمعية العلوم الخيرية"}</div>
         </header>
 
-        <div className="print:hidden bg-primary-600 text-white text-center text-xs sm:text-sm py-1.5">
-          {new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+        <div className="flex-shrink-0 bg-primary-600 text-white text-xs sm:text-sm py-1.5 px-3 flex items-center justify-between gap-2">
+          <span className="flex-1 text-center">
+            {new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          </span>
+          <PeriodPicker />
         </div>
 
-        {/* المحتوى الأساسي - بيسكرول طبيعي مع الصفحة، مش جواه هو */}
-        <main className="flex-1 p-4 lg:p-8 print:p-0">
+        {/* منطقة المحتوى القابلة للسكرول */}
+        <main className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-8">
           <div className="max-w-7xl w-full mx-auto">{children}</div>
         </main>
 
-        {/* الفوتر جزء من تدفق الصفحة، بيظهر في آخرها بعد المحتوى */}
-        <div className="print:hidden">
+        {/* الفوتر ثابت أسفل الشاشة دايمًا */}
+        <div className="flex-shrink-0">
           <Footer whatsappNumber={settings?.whatsappNumber} />
         </div>
       </div>
-
-      <div className="print:hidden">
-        <FloatingWhatsApp whatsappNumber={settings?.whatsappNumber} />
-      </div>
+      <FloatingWhatsApp whatsappNumber={settings?.whatsappNumber} />
     </div>
   );
 };
