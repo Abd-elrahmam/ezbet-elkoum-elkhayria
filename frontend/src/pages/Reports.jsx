@@ -57,7 +57,7 @@ const memRange = (r) => {
 
 const revRange = (r) => {
   if (!r.revFromSurah && !r.revToSurah) return null;
-  return `من ${r.revFromSurah || "—"}${r.revFromAyah ? ` (آية ${r.revFromAyah})` : ""} إلى ${r.revToSurah || "—"}${r.revToAyah ? ` (آية ${r.revToAyah})` : ""}`;
+  return `من سورة ${r.revFromSurah || "—"} إلى سورة ${r.revToSurah || "—"}`;
 };
 
 const Reports = () => {
@@ -336,12 +336,22 @@ const Reports = () => {
                     <div className="space-y-3 text-sm">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-primary-50 rounded-xl px-3 py-2 text-center">
-                          <p className="text-xs text-primary-600 mb-1">📖 إجمالي الحفظ الجديد</p>
-                          <p className="text-lg font-extrabold text-primary-700">{formatPagesOrJuz(report.hifz.totalMemPages)}</p>
+                          <p className="text-xs text-primary-600 mb-1">📖 الحفظ الجديد</p>
+                          <p className="text-lg font-extrabold text-primary-700">
+                            {formatPagesOrJuz(report.hifz.totalMemPages)}
+                            {report.hifz.expectedPages > 0 && (
+                              <span className="text-xs font-normal text-primary-500"> من {formatPagesOrJuz(report.hifz.expectedPages)}</span>
+                            )}
+                          </p>
                         </div>
                         <div className="bg-sand-100 rounded-xl px-3 py-2 text-center">
-                          <p className="text-xs text-sand-500 mb-1">🔄 إجمالي المراجعة</p>
-                          <p className="text-lg font-extrabold text-sand-700">{formatPagesOrJuz(report.hifz.totalRevisionPages)}</p>
+                          <p className="text-xs text-sand-500 mb-1">🔄 المراجعة</p>
+                          <p className="text-lg font-extrabold text-sand-700">
+                            {formatPagesOrJuz(report.hifz.totalRevisionPages)}
+                            {report.hifz.expectedRevisionPages > 0 && (
+                              <span className="text-xs font-normal text-sand-500"> من {formatPagesOrJuz(report.hifz.expectedRevisionPages)}</span>
+                            )}
+                          </p>
                         </div>
                       </div>
                       {memRange(report.hifz) && (

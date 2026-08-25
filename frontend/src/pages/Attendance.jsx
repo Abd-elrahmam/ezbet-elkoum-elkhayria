@@ -3,7 +3,7 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { usePeriod, MONTH_NAMES } from "../context/PeriodContext";
 
-const MONTH_TOTAL_DAYS = 22;
+const MONTH_TOTAL_DAYS = 20;
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -283,7 +283,7 @@ const Attendance = () => {
       {tab === "monthly" && (
         <>
           <p className="text-xs text-sand-400 mb-3">
-            الشهر معتمد كـ 22 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 20).
+            الشهر معتمد كـ 20 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 20).
           </p>
           {summaryMessage && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{summaryMessage}</div>}
           <div className="card overflow-x-auto">

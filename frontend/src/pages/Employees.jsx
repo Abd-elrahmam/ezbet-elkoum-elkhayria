@@ -31,6 +31,15 @@ const Employees = () => {
   const [photoPreview, setPhotoPreview] = useState("");
   const [savingPhoto, setSavingPhoto] = useState(false);
 
+  // إدارة مجموعة طلاب المدرس (بروفايل الشيخ)
+  const [groupTeacher, setGroupTeacher] = useState(null);
+  const [groupStudents, setGroupStudents] = useState([]); // كل الطلاب المرشحين (نفس الفرع)
+  const [groupSelected, setGroupSelected] = useState(new Set());
+  const [groupSearch, setGroupSearch] = useState("");
+  const [groupLoading, setGroupLoading] = useState(false);
+  const [groupSaving, setGroupSaving] = useState(false);
+  const [groupMsg, setGroupMsg] = useState("");
+
   const load = () => {
     setLoading(true);
     api.get("/users").then((res) => setUsers(res.data)).finally(() => setLoading(false));
@@ -120,6 +129,54 @@ const Employees = () => {
     load();
   };
 
+  // فتح "بروفايل الشيخ" وتحميل كل طلاب فرعه + تحديد الموجودين معاه حاليًا
+  const openTeacherGroup = async (teacher) => {
+    setGroupTeacher(teacher);
+    setGroupSearch("");
+    setGroupMsg("");
+    setGroupLoading(true);
+    try {
+      const params = {};
+      const branchId = teacher.branch?._id || teacher.branch;
+      if (branchId) params.branch = branchId;
+      const res = await api.get("/students", { params });
+      setGroupStudents(res.data);
+      const assigned = res.data.filter((s) => (s.teacher?._id || s.teacher) === teacher._id).map((s) => s._id);
+      setGroupSelected(new Set(assigned));
+    } finally {
+      setGroupLoading(false);
+    }
+  };
+  const closeTeacherGroup = () => setGroupTeacher(null);
+
+  const toggleGroupStudent = (id) => {
+    setGroupSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const saveTeacherGroup = async () => {
+    if (!groupTeacher) return;
+    setGroupSaving(true);
+    setGroupMsg("");
+    try {
+      await api.put("/students/assign-teacher-group", {
+        teacherId: groupTeacher._id,
+        studentIds: Array.from(groupSelected),
+      });
+      setGroupMsg("تم تحديث مجموعة الطلاب بنجاح ✅");
+    } catch (err) {
+      setGroupMsg(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
+    } finally {
+      setGroupSaving(false);
+    }
+  };
+
+  const filteredGroupStudents = groupStudents.filter((s) => s.name.toLowerCase().includes(groupSearch.toLowerCase()));
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -170,6 +227,9 @@ const Employees = () => {
                   </td>
                   <td>
                     <div className="flex gap-2">
+                      {u.role === "employee" && (
+                        <button className="btn-ghost" onClick={() => openTeacherGroup(u)}>👥 طلابه</button>
+                      )}
                       <button className="btn-ghost" onClick={() => openEdit(u)}>تعديل</button>
                       {u.role !== "super_admin" && (
                         <button className="btn-ghost text-red-500" onClick={() => setDeleteId(u._id)}>حذف</button>
@@ -262,6 +322,49 @@ const Employees = () => {
           </div>
           <button className="btn-primary w-full justify-center">{editing ? "حفظ التعديلات" : "إضافة"}</button>
         </form>
+      </Modal>
+
+      <Modal open={!!groupTeacher} onClose={closeTeacherGroup} title={groupTeacher ? `طلاب ${groupTeacher.name}` : ""} wide>
+        {groupTeacher && (
+          <div>
+            <p className="text-xs text-sand-400 mb-3">
+              حدد كل الطلاب اللي المفروض يكونوا مع {groupTeacher.name} دفعة واحدة. أي طالب كان معينله قبل كده وشيلته من الاختيار، هيترفع منه المدرس تلقائيًا.
+            </p>
+            <input
+              className="input mb-3"
+              placeholder="بحث بالاسم..."
+              value={groupSearch}
+              onChange={(e) => setGroupSearch(e.target.value)}
+            />
+            {groupLoading ? (
+              <p className="text-sand-500 py-6 text-center">جارِ التحميل...</p>
+            ) : (
+              <div className="max-h-[50vh] overflow-y-auto divide-y divide-sand-100 border border-sand-100 rounded-xl mb-3">
+                {filteredGroupStudents.map((s) => (
+                  <label key={s._id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-sand-50">
+                    <input
+                      type="checkbox"
+                      checked={groupSelected.has(s._id)}
+                      onChange={() => toggleGroupStudent(s._id)}
+                    />
+                    <span className="flex-1">{s.name}</span>
+                    {s.teacher && (s.teacher._id || s.teacher) !== groupTeacher._id && (
+                      <span className="text-xs text-sand-400">مع: {s.teacher.name || "مدرس آخر"}</span>
+                    )}
+                  </label>
+                ))}
+                {filteredGroupStudents.length === 0 && (
+                  <p className="text-center text-sand-400 py-6">لا يوجد طلاب مطابقين</p>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-sand-500 mb-3">تم اختيار {groupSelected.size} طالب</p>
+            {groupMsg && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-3">{groupMsg}</div>}
+            <button className="btn-primary w-full justify-center" onClick={saveTeacherGroup} disabled={groupSaving}>
+              {groupSaving ? "جارِ الحفظ..." : "حفظ المجموعة"}
+            </button>
+          </div>
+        )}
       </Modal>
 
       <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} message="سيتم حذف المستخدم نهائيًا. هل أنت متأكد؟" />

@@ -3,7 +3,7 @@ const Hifz = require("../models/Hifz");
 const MonthlyAttendanceSummary = require("../models/MonthlyAttendanceSummary");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
-const { computePagesRangeByName } = require("../utils/quranPages");
+const { computePagesRangeByName, findSurahByName } = require("../utils/quranPages");
 
 const router = express.Router();
 router.use(protect);
@@ -60,7 +60,17 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
         const memCalc = status === "normal"
           ? computePagesRangeByName(r.memFromSurah, r.memFromAyah, r.memToSurah, r.memToAyah)
           : { pagesCount: 0 };
-        const revCalc = computePagesRangeByName(r.revFromSurah, r.revFromAyah, r.revToSurah, r.revToAyah);
+
+        // المراجعة بتتحسب بالسورة كاملة (من أول آية في "من سورة" لحد آخر آية في "إلى سورة")
+        // مش بآية محددة، لأن المراجعة غالبًا بتكون بالسور/الأجزاء مش بجزء من آية
+        const revFromSurahObj = findSurahByName(r.revFromSurah);
+        const revToSurahObj = findSurahByName(r.revToSurah);
+        const revFromAyah = revFromSurahObj ? 1 : null;
+        const revToAyah = revToSurahObj ? revToSurahObj.ayahCount : null;
+        const revCalc = computePagesRangeByName(r.revFromSurah, revFromAyah, r.revToSurah, revToAyah);
+
+        const revTargetJuz = r.revTargetJuz != null ? Number(r.revTargetJuz) : null;
+        const expectedRevisionPages = revTargetJuz != null ? Math.round(revTargetJuz * 20 * 100) / 100 : null;
 
         const query = r.student ? { student: r.student, month: r.month } : { employee: r.employee, month: r.month };
 
@@ -83,9 +93,11 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
             memToAyah: status === "normal" ? r.memToAyah || null : null,
             totalMemPages: memCalc.pagesCount || 0,
             revFromSurah: r.revFromSurah || "",
-            revFromAyah: r.revFromAyah || null,
+            revFromAyah,
             revToSurah: r.revToSurah || "",
-            revToAyah: r.revToAyah || null,
+            revToAyah,
+            revTargetJuz,
+            expectedRevisionPages,
             totalRevisionPages: revCalc.pagesCount || 0,
             mutoonFrom: r.mutoonFrom || "",
             mutoonTo: r.mutoonTo || "",

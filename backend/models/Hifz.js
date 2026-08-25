@@ -29,11 +29,13 @@ const hifzSchema = new mongoose.Schema(
     memToAyah: { type: Number, default: null },
     totalMemPages: { type: Number, min: 0, default: 0 },
 
-    // المراجعة
+    // المراجعة (بالسور - من سورة لسورة، مش بالآية)
     revFromSurah: { type: String, trim: true, default: "" },
     revFromAyah: { type: Number, default: null },
     revToSurah: { type: String, trim: true, default: "" },
     revToAyah: { type: Number, default: null },
+    revTargetJuz: { type: Number, min: 0, default: null }, // المطلوب مراجعته هذا الشهر (بالأجزاء)
+    expectedRevisionPages: { type: Number, min: 0, default: null }, // = revTargetJuz × 20
     totalRevisionPages: { type: Number, min: 0, default: 0 },
 
     // المتون (لبعض الحلقات بتحفظ متون بجانب القرآن)
