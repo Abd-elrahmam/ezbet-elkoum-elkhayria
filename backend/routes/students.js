@@ -27,8 +27,7 @@ router.get("/", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) filter.teacher = req.user._id; // المدرس يشوف طلابه فقط
 
   // ترتيب النتائج: أبجدي بالاسم (الافتراضي) أو حسب ترتيب الإضافة (الأقدم فالأحدث)
-  const sortOption =
-    req.query.sort === "added" ? { createdAt: 1 } : { name: 1 };
+  const sortOption = req.query.sort === "added" ? { createdAt: 1 } : { name: 1 };
 
   const students = await Student.find(filter)
     .populate("branch", "name")
@@ -38,9 +37,7 @@ router.get("/", async (req, res) => {
 });
 
 router.get("/:id", async (req, res) => {
-  const student = await Student.findById(req.params.id)
-    .populate("branch", "name")
-    .populate("teacher", "name");
+  const student = await Student.findById(req.params.id).populate("branch", "name").populate("teacher", "name");
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
   res.json(student);
 });
@@ -57,54 +54,15 @@ router.post("/", scopeToOwnBranch, async (req, res) => {
   }
 });
 
-// تحديد "مجموعة" طلاب مدرس معين دفعة واحدة (بدل توزيع كل طالب لوحده)
-// studentIds = القائمة الكاملة المطلوب إسنادها للمدرس ده؛ أي طالب كان
-// متسجل عنده قبل كده وشيل من القائمة بيترفع منه المدرس تلقائيًا
-router.put("/assign-teacher-group", async (req, res) => {
-  if (req.user.role === ROLES.EMPLOYEE) {
-    return res.status(403).json({ message: "ليس لديك صلاحية توزيع الطلاب" });
-  }
-  const { teacherId, studentIds } = req.body;
-  if (!teacherId || !Array.isArray(studentIds)) {
-    return res.status(400).json({ message: "بيانات ناقصة" });
-  }
-
-  const branchFilter =
-    req.user.role === ROLES.SUPER_ADMIN ? {} : { branch: req.user.branch };
-
-  // شيل المدرس من أي طالب كان معينله قبل كده ومش موجود في القائمة الجديدة
-  await Student.updateMany(
-    { ...branchFilter, teacher: teacherId, _id: { $nin: studentIds } },
-    { teacher: null },
-  );
-  // عيّن المدرس لكل الطلاب في القائمة الجديدة
-  await Student.updateMany(
-    { ...branchFilter, _id: { $in: studentIds } },
-    { teacher: teacherId },
-  );
-
-  const group = await Student.find({ ...branchFilter, teacher: teacherId })
-    .populate("branch", "name")
-    .sort({ name: 1 });
-  res.json(group);
-});
-
 router.put("/:id", scopeToOwnBranch, async (req, res) => {
   try {
     if (req.user.role === ROLES.EMPLOYEE) {
-      return res
-        .status(403)
-        .json({ message: "ليس لديك صلاحية تعديل بيانات الطلاب" });
+      return res.status(403).json({ message: "ليس لديك صلاحية تعديل بيانات الطلاب" });
     }
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
-    if (
-      req.user.role !== ROLES.SUPER_ADMIN &&
-      student.branch.toString() !== req.user.branch.toString()
-    ) {
-      return res
-        .status(403)
-        .json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
+    if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
+      return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
     }
     Object.assign(student, req.body);
     await student.save();
@@ -120,10 +78,7 @@ router.delete("/:id", async (req, res) => {
   }
   const student = await Student.findById(req.params.id);
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
-  if (
-    req.user.role !== ROLES.SUPER_ADMIN &&
-    student.branch.toString() !== req.user.branch.toString()
-  ) {
+  if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك حذف طالب من فرع آخر" });
   }
   await student.deleteOne();
@@ -138,10 +93,7 @@ router.put("/:id/assign-teacher", async (req, res) => {
   const { teacherId } = req.body;
   const student = await Student.findById(req.params.id);
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
-  if (
-    req.user.role !== ROLES.SUPER_ADMIN &&
-    student.branch.toString() !== req.user.branch.toString()
-  ) {
+  if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
   }
   student.teacher = teacherId || null;
@@ -149,21 +101,46 @@ router.put("/:id/assign-teacher", async (req, res) => {
   res.json(student);
 });
 
+// تحديد "مجموعة" طلاب مدرس معين دفعة واحدة (بدل توزيع كل طالب لوحده)
+// studentIds = القائمة الكاملة المطلوب إسنادها للمدرس ده؛ أي طالب كان
+// متسجل عنده قبل كده وشيل من القائمة بيترفع منه المدرس تلقائيًا
+router.put("/assign-teacher-group", async (req, res) => {
+  if (req.user.role === ROLES.EMPLOYEE) {
+    return res.status(403).json({ message: "ليس لديك صلاحية توزيع الطلاب" });
+  }
+  const { teacherId, studentIds } = req.body;
+  if (!teacherId || !Array.isArray(studentIds)) {
+    return res.status(400).json({ message: "بيانات ناقصة" });
+  }
+
+  const branchFilter = req.user.role === ROLES.SUPER_ADMIN ? {} : { branch: req.user.branch };
+
+  // شيل المدرس من أي طالب كان معينله قبل كده ومش موجود في القائمة الجديدة
+  await Student.updateMany(
+    { ...branchFilter, teacher: teacherId, _id: { $nin: studentIds } },
+    { teacher: null }
+  );
+  // عيّن المدرس لكل الطلاب في القائمة الجديدة
+  await Student.updateMany(
+    { ...branchFilter, _id: { $in: studentIds } },
+    { teacher: teacherId }
+  );
+
+  const group = await Student.find({ ...branchFilter, teacher: teacherId })
+    .populate("branch", "name")
+    .sort({ name: 1 });
+  res.json(group);
+});
+
 // رفع صورة الطالب
 router.put("/:id/photo", upload.single("photo"), async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) {
-    return res
-      .status(403)
-      .json({ message: "ليس لديك صلاحية تعديل صورة الطالب" });
+    return res.status(403).json({ message: "ليس لديك صلاحية تعديل صورة الطالب" });
   }
-  if (!req.file)
-    return res.status(400).json({ message: "لم يتم إرسال أي صورة" });
+  if (!req.file) return res.status(400).json({ message: "لم يتم إرسال أي صورة" });
   const student = await Student.findById(req.params.id);
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
-  if (
-    req.user.role !== ROLES.SUPER_ADMIN &&
-    student.branch.toString() !== req.user.branch.toString()
-  ) {
+  if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
   }
   deleteOldPhoto(student.photoUrl);
@@ -175,16 +152,11 @@ router.put("/:id/photo", upload.single("photo"), async (req, res) => {
 // حذف صورة الطالب
 router.delete("/:id/photo", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) {
-    return res
-      .status(403)
-      .json({ message: "ليس لديك صلاحية تعديل صورة الطالب" });
+    return res.status(403).json({ message: "ليس لديك صلاحية تعديل صورة الطالب" });
   }
   const student = await Student.findById(req.params.id);
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
-  if (
-    req.user.role !== ROLES.SUPER_ADMIN &&
-    student.branch.toString() !== req.user.branch.toString()
-  ) {
+  if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
   }
   deleteOldPhoto(student.photoUrl);

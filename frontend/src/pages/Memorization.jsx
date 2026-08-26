@@ -31,7 +31,9 @@ const emptyDraft = () => ({
   memToAyah: "",
   revFromSurah: "",
   revToSurah: "",
-  revTargetJuz: 1,
+  revDailyRatePages: 0.5,
+  revGrade: "",
+  revGradeMode: "auto",
   mutoonFrom: "",
   mutoonTo: "",
   grade: "",
@@ -153,7 +155,9 @@ const Memorization = () => {
           memToAyah: r.memToAyah || "",
           revFromSurah: surahNumberByName(r.revFromSurah),
           revToSurah: surahNumberByName(r.revToSurah),
-          revTargetJuz: r.revTargetJuz ?? 1,
+          revDailyRatePages: r.revDailyRatePages ?? 0.5,
+          revGrade: r.revGrade || "",
+          revGradeMode: r.revGrade ? "manual" : "auto",
           mutoonFrom: r.mutoonFrom || "",
           mutoonTo: r.mutoonTo || "",
           grade: r.grade || "",
@@ -202,13 +206,14 @@ const Memorization = () => {
       const lastAyah = toSurahInfo ? toSurahInfo.ayahCount : 1;
       revPages = computePagesRange(draft.revFromSurah, 1, draft.revToSurah, lastAyah).pagesCount;
     }
-    const expectedRevisionPages = draft.revTargetJuz ? Math.round(Number(draft.revTargetJuz) * 20 * 100) / 100 : 0;
+    const revDailyRate = Number(draft.revDailyRatePages) || 0;
+    const expectedRevisionPages = Math.round(revDailyRate * (presentDays || 0) * 100) / 100;
     const revPct = expectedRevisionPages > 0 ? Math.round((revPages / expectedRevisionPages) * 100) : null;
     const pct = expectedPages > 0 ? Math.round((memPages / expectedPages) * 100) : null;
     return { presentDays, expectedPages, memPages, revPages, pct, expectedRevisionPages, revPct };
   }, [draft, activeStudent, attendanceMap]);
 
-  // تحديث التقدير تلقائيًا من النسبة، إلا لو المستخدم اختار تقدير بنفسه (gradeMode = manual)
+  // تحديث تقدير الحفظ تلقائيًا من نسبة الحفظ، إلا لو المستخدم اختار تقدير بنفسه
   useEffect(() => {
     if (draft.gradeMode !== "auto") return;
     if (draft.status !== "normal" || draftCalc.pct == null) return;
@@ -218,12 +223,30 @@ const Memorization = () => {
     }
   }, [draftCalc.pct, draft.gradeMode, draft.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // تحديث تقدير المراجعة تلقائيًا من نسبة المراجعة (منفصل تمامًا عن تقييم الحفظ)
+  useEffect(() => {
+    if (draft.revGradeMode !== "auto") return;
+    if (draftCalc.revPct == null) return;
+    const suggested = autoGradeFromPercent(draftCalc.revPct);
+    if (suggested && suggested !== draft.revGrade) {
+      setDraft((prev) => ({ ...prev, revGrade: suggested }));
+    }
+  }, [draftCalc.revPct, draft.revGradeMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleGradeChange = (value) => {
     setDraft((prev) => ({ ...prev, grade: value, gradeMode: "manual" }));
   };
   const resetGradeToAuto = () => {
     const suggested = draftCalc.pct != null ? autoGradeFromPercent(draftCalc.pct) : "";
     setDraft((prev) => ({ ...prev, grade: suggested, gradeMode: "auto" }));
+  };
+
+  const handleRevGradeChange = (value) => {
+    setDraft((prev) => ({ ...prev, revGrade: value, revGradeMode: "manual" }));
+  };
+  const resetRevGradeToAuto = () => {
+    const suggested = draftCalc.revPct != null ? autoGradeFromPercent(draftCalc.revPct) : "";
+    setDraft((prev) => ({ ...prev, revGrade: suggested, revGradeMode: "auto" }));
   };
 
   const handleSaveDraft = async () => {
@@ -247,7 +270,8 @@ const Memorization = () => {
           memToAyah: draft.memToAyah || null,
           revFromSurah: surahNameByNumber(draft.revFromSurah),
           revToSurah: surahNameByNumber(draft.revToSurah),
-          revTargetJuz: draft.revTargetJuz === "" ? null : Number(draft.revTargetJuz),
+          revDailyRatePages: Number(draft.revDailyRatePages) || 0,
+          revGrade: draft.revGrade || null,
           mutoonFrom: draft.mutoonFrom || "",
           mutoonTo: draft.mutoonTo || "",
           grade: draft.grade || null,
@@ -440,16 +464,22 @@ const Memorization = () => {
             {/* المراجعة */}
             <div className="bg-sky-50/50 rounded-xl p-3 mb-4">
               <p className="text-sm font-bold text-sky-700 mb-2">🔁 المراجعة</p>
-              <div className="mb-2">
-                <label className="label">المطلوب مراجعته هذا الشهر (بالأجزاء)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min={0}
-                  className="input"
-                  value={draft.revTargetJuz}
-                  onChange={(e) => updateDraft("revTargetJuz", e.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="label">معدل المراجعة اليومي (صفحة)</label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    min={0}
+                    className="input"
+                    value={draft.revDailyRatePages}
+                    onChange={(e) => updateDraft("revDailyRatePages", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">المتوقع مراجعته هذا الشهر</label>
+                  <input className="input bg-white" readOnly value={formatPagesOrJuz(draftCalc.expectedRevisionPages)} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-2">
                 <SurahOnlyPicker label="من" surahValue={draft.revFromSurah} onSurah={(v) => updateDraft("revFromSurah", v)} />
@@ -483,9 +513,9 @@ const Memorization = () => {
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
                 <div className="flex items-center justify-between">
-                  <label className="label">التقييم {draft.gradeMode === "auto" && draftCalc.pct != null && <span className="text-primary-600">(تلقائي من النسبة)</span>}</label>
+                  <label className="label">تقييم الحفظ {draft.gradeMode === "auto" && draftCalc.pct != null && <span className="text-primary-600">(تلقائي)</span>}</label>
                   {draft.gradeMode === "manual" && draftCalc.pct != null && (
-                    <button type="button" onClick={resetGradeToAuto} className="text-xs text-primary-600 hover:underline">🔄 احسب تلقائي</button>
+                    <button type="button" onClick={resetGradeToAuto} className="text-xs text-primary-600 hover:underline">🔄 تلقائي</button>
                   )}
                 </div>
                 <select className="input" value={draft.grade} onChange={(e) => handleGradeChange(e.target.value)}>
@@ -495,9 +525,23 @@ const Memorization = () => {
                 </select>
               </div>
               <div>
-                <label className="label">ملاحظات</label>
-                <input className="input" value={draft.notes} onChange={(e) => updateDraft("notes", e.target.value)} />
+                <div className="flex items-center justify-between">
+                  <label className="label">تقييم المراجعة {draft.revGradeMode === "auto" && draftCalc.revPct != null && <span className="text-primary-600">(تلقائي)</span>}</label>
+                  {draft.revGradeMode === "manual" && draftCalc.revPct != null && (
+                    <button type="button" onClick={resetRevGradeToAuto} className="text-xs text-primary-600 hover:underline">🔄 تلقائي</button>
+                  )}
+                </div>
+                <select className="input" value={draft.revGrade} onChange={(e) => handleRevGradeChange(e.target.value)}>
+                  {GRADE_OPTIONS.map((g) => (
+                    <option key={g.value} value={g.value}>{g.label}</option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="label">ملاحظات</label>
+              <input className="input" value={draft.notes} onChange={(e) => updateDraft("notes", e.target.value)} />
             </div>
 
             {saveMsg && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-3">{saveMsg}</div>}

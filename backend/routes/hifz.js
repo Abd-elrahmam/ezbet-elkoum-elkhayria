@@ -69,8 +69,11 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
         const revToAyah = revToSurahObj ? revToSurahObj.ayahCount : null;
         const revCalc = computePagesRangeByName(r.revFromSurah, revFromAyah, r.revToSurah, revToAyah);
 
-        const revTargetJuz = r.revTargetJuz != null ? Number(r.revTargetJuz) : null;
-        const expectedRevisionPages = revTargetJuz != null ? Math.round(revTargetJuz * 20 * 100) / 100 : null;
+        const revDailyRatePages = r.revDailyRatePages != null ? Number(r.revDailyRatePages) : null;
+        const expectedRevisionPages =
+          revDailyRatePages == null || presentDays == null
+            ? null
+            : Math.round(revDailyRatePages * presentDays * 100) / 100;
 
         const query = r.student ? { student: r.student, month: r.month } : { employee: r.employee, month: r.month };
 
@@ -96,9 +99,10 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
             revFromAyah,
             revToSurah: r.revToSurah || "",
             revToAyah,
-            revTargetJuz,
+            revDailyRatePages,
             expectedRevisionPages,
             totalRevisionPages: revCalc.pagesCount || 0,
+            revGrade: r.revGrade || null,
             mutoonFrom: r.mutoonFrom || "",
             mutoonTo: r.mutoonTo || "",
             grade: r.grade || null,

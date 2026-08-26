@@ -126,7 +126,7 @@ const Reports = () => {
       } else if (reportType === "employee") {
         const employee = employees.find((e) => e._id === selectedPerson);
         const [attendanceRes, salariesRes, leavesRes, hifzRes] = await Promise.all([
-          api.get("/employee-attendance", { params: { employee: selectedPerson, month } }),
+          api.get("/employee-monthly-attendance", { params: { employee: selectedPerson, month } }),
           api.get("/salaries", { params: { employee: selectedPerson, month } }),
           api.get("/leaves", { params: { employee: selectedPerson } }),
           api.get("/hifz", { params: { employee: selectedPerson, month } }),
@@ -137,12 +137,10 @@ const Reports = () => {
           const e2 = new Date(l.endDate);
           return s < end && e2 >= start;
         });
-        const dailySummary = { present: 0, absent: 0, late: 0, excused: 0 };
-        attendanceRes.data.forEach((r) => { if (dailySummary[r.status] !== undefined) dailySummary[r.status] += 1; });
         setReport({
           type: "employee",
           person: employee,
-          attendance: dailySummary,
+          attendance: sumAttendance(attendanceRes.data),
           salary: salariesRes.data[0] || null,
           leaves: leavesThisMonth,
           hifz: hifzRes.data[0] || null,
@@ -167,7 +165,7 @@ const Reports = () => {
           api.get("/students", { params: { branch: branchId } }),
           api.get("/users", { params: { branch: branchId, role: "employee" } }),
           api.get("/monthly-attendance", { params: { branch: branchId, month } }),
-          api.get("/employee-attendance", { params: { branch: branchId, month } }),
+          api.get("/employee-monthly-attendance", { params: { branch: branchId, month } }),
           api.get("/payments", { params: { branch: branchId, month } }),
           api.get("/expenses", { params: { branch: branchId, month } }),
           api.get("/salaries", { params: { branch: branchId, month } }),
@@ -178,11 +176,7 @@ const Reports = () => {
         ]);
 
         const studentAttendance = sumAttendance(attendanceRes.data.filter((a) => a.student));
-        // حضور الموظفين بقى يومي: كل سجل = يوم واحد بحالة واحدة، فبنعد التكرارات
-        const employeeAttendance = { present: 0, absent: 0, late: 0, excused: 0 };
-        employeeAttendanceRes.data.forEach((r) => {
-          if (employeeAttendance[r.status] !== undefined) employeeAttendance[r.status] += 1;
-        });
+        const employeeAttendance = sumAttendance(employeeAttendanceRes.data);
 
         const totalIncome = paymentsRes.data.reduce((sum, p) => sum + p.amount, 0);
         const totalExpenses = expensesRes.data.reduce((sum, e) => sum + e.amount, 0);
@@ -299,7 +293,7 @@ const Reports = () => {
             <div className="flex items-center gap-4 border-b-2 border-primary-600 pb-4 mb-6">
               <img src={logoSrc} alt="الشعار" className="w-16 h-16 rounded-full object-cover border border-sand-200" />
               <div>
-                <h2 className="text-xl font-bold text-sand-900">{settings?.heroTitle || "جمعية العلوم الخيرية بعزبة الكوم"}</h2>
+                <h2 className="text-xl font-bold text-sand-900">{settings?.heroTitle || "جمعية الكوم الخيرية بعزبة الكوم"}</h2>
                 <p className="text-sand-500 text-sm">تقرير شهري {reportTitle} — {monthLabel(month)}</p>
               </div>
             </div>
@@ -363,9 +357,14 @@ const Reports = () => {
                       {(report.hifz.mutoonFrom || report.hifz.mutoonTo) && (
                         <p><span className="text-sand-500">المتون: </span><span className="font-semibold">من {report.hifz.mutoonFrom || "—"} إلى {report.hifz.mutoonTo || "—"}</span></p>
                       )}
-                      {report.hifz.grade && (
-                        <span className="badge bg-primary-50 text-primary-700">التقييم: {GRADE_LABELS[report.hifz.grade]}</span>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {report.hifz.grade && (
+                          <span className="badge bg-primary-50 text-primary-700">تقييم الحفظ: {GRADE_LABELS[report.hifz.grade]}</span>
+                        )}
+                        {report.hifz.revGrade && (
+                          <span className="badge bg-sky-50 text-sky-700">تقييم المراجعة: {GRADE_LABELS[report.hifz.revGrade]}</span>
+                        )}
+                      </div>
                       {report.hifz.notes && <p className="text-sand-500 pt-1">ملاحظات: {report.hifz.notes}</p>}
                     </div>
                   ) : (

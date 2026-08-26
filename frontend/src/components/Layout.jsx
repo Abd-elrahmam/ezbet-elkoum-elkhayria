@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: "/students", label: "الطلاب", icon: "🎓", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/employees", label: "الموظفون", icon: "👥", roles: ["super_admin", "branch_manager"] },
   { to: "/attendance", label: "الحضور والغياب", icon: "📋", roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/employee-attendance", label: "حضور الموظفين", icon: "🗓️", roles: ["super_admin", "branch_manager"] },
   { to: "/memorization", label: "تسجيل الحفظ الشهري", icon: "📖", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/tests", label: "الاختبارات", icon: "📝", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/evaluations", label: "تقييم الطلاب", icon: "⭐", roles: ["super_admin", "branch_manager", "employee"] },

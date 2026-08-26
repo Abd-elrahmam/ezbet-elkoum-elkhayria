@@ -11,6 +11,7 @@ import Branches from "./pages/Branches";
 import Students from "./pages/Students";
 import Employees from "./pages/Employees";
 import Attendance from "./pages/Attendance";
+import EmployeeAttendance from "./pages/EmployeeAttendance";
 import Memorization from "./pages/Memorization";
 import Reports from "./pages/Reports";
 import Tests from "./pages/Tests";
@@ -51,6 +52,7 @@ function App() {
         element={<ProtectedRoute roles={["super_admin", "branch_manager"]}>{withLayout(Employees)}</ProtectedRoute>}
       />
       <Route path="/attendance" element={<ProtectedRoute>{withLayout(Attendance)}</ProtectedRoute>} />
+      <Route path="/employee-attendance" element={<ProtectedRoute>{withLayout(EmployeeAttendance)}</ProtectedRoute>} />
       <Route path="/memorization" element={<ProtectedRoute>{withLayout(Memorization)}</ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute>{withLayout(Reports)}</ProtectedRoute>} />
       <Route path="/tests" element={<ProtectedRoute>{withLayout(Tests)}</ProtectedRoute>} />

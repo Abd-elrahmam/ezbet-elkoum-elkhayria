@@ -48,12 +48,12 @@ const Dashboard = () => {
         </div>
       )}
 
-      <div className="card">
+      {/* <div className="card">
         <h2 className="font-bold text-sand-800 mb-2">تنقّل سريع</h2>
         <p className="text-sand-500 text-sm">
           استخدم القائمة الجانبية للوصول إلى الطلاب، الحضور والغياب، الاختبارات، تقييم الطلاب، طلبات الإجازة، والرواتب.
         </p>
-      </div>
+      </div> */}
     </div>
   );
 };

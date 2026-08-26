@@ -34,6 +34,7 @@ app.use("/api/leaves", require("./routes/leaves"));
 app.use("/api/evaluations", require("./routes/evaluations"));
 app.use("/api/monthly-attendance", require("./routes/monthlyAttendance"));
 app.use("/api/employee-attendance", require("./routes/employeeAttendance"));
+app.use("/api/employee-monthly-attendance", require("./routes/employeeMonthlyAttendance"));
 app.use("/api/hifz", require("./routes/hifz"));
 
 // معالجة الأخطاء العامة

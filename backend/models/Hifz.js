@@ -34,15 +34,18 @@ const hifzSchema = new mongoose.Schema(
     revFromAyah: { type: Number, default: null },
     revToSurah: { type: String, trim: true, default: "" },
     revToAyah: { type: Number, default: null },
-    revTargetJuz: { type: Number, min: 0, default: null }, // المطلوب مراجعته هذا الشهر (بالأجزاء)
-    expectedRevisionPages: { type: Number, min: 0, default: null }, // = revTargetJuz × 20
+    // معدل المراجعة اليومي (صفحة) - زي معدل الحفظ اليومي بالظبط، بيتحسب بيه
+    // المتوقع مراجعته = revDailyRatePages × أيام الحضور
+    revDailyRatePages: { type: Number, min: 0, default: null },
+    expectedRevisionPages: { type: Number, min: 0, default: null },
     totalRevisionPages: { type: Number, min: 0, default: 0 },
+    revGrade: { type: String, enum: [...GRADES, null], default: null }, // تقييم المراجعة (منفصل عن تقييم الحفظ)
 
     // المتون (لبعض الحلقات بتحفظ متون بجانب القرآن)
     mutoonFrom: { type: String, trim: true, default: "" },
     mutoonTo: { type: String, trim: true, default: "" },
 
-    grade: { type: String, enum: [...GRADES, null], default: null },
+    grade: { type: String, enum: [...GRADES, null], default: null }, // تقييم الحفظ الجديد
     notes: { type: String, trim: true, default: "" },
   },
   { timestamps: true }
