@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
-import { formatPagesOrJuz } from "../utils/quran";
+import { formatPages } from "../utils/quran";
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -58,6 +58,67 @@ const memRange = (r) => {
 const revRange = (r) => {
   if (!r.revFromSurah && !r.revToSurah) return null;
   return `من سورة ${r.revFromSurah || "—"} إلى سورة ${r.revToSurah || "—"}`;
+};
+
+const GRADE_LABELS_AR = GRADE_LABELS; // alias للوضوح جوه رسالة الواتساب
+
+// تحويل رقم موبايل مصري (01xxxxxxxxx) لصيغة دولية بدون + أو أصفار عشان رابط واتساب
+const toWhatsAppNumber = (phone) => {
+  if (!phone) return null;
+  let digits = String(phone).replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("0")) digits = "20" + digits.slice(1);
+  else if (!digits.startsWith("20")) digits = "20" + digits;
+  return digits;
+};
+
+// تجهيز نص رسالة الواتساب اللي هتتبعت لولي أمر الطالب
+const buildWhatsAppMessage = (report, monthText) => {
+  const student = report.person;
+  const deptLabel = student?.department === "nursery" ? "الحضانة" : "الكتاب";
+  const branchName = student?.branch?.name || "";
+  const guardianName = student?.guardianName ? `سيد/ة ${student.guardianName}` : "ولي الأمر الكريم";
+
+  const lines = [];
+  lines.push(`السلام عليكم ${guardianName}`);
+  lines.push(`ولي أمر الطالب: ${student?.name || ""}`);
+  lines.push(`هذا تقرير ${monthText} من إدارة ${deptLabel}${branchName ? ` - فرع ${branchName}` : ""}`);
+  lines.push("");
+  lines.push("📋 *الحضور والغياب*");
+  lines.push(`حاضر: ${report.attendance.present} يوم | غائب: ${report.attendance.absent} يوم | متأخر: ${report.attendance.late} | معتذر: ${report.attendance.excused}`);
+
+  if (report.hifz) {
+    lines.push("");
+    lines.push("📖 *الحفظ الشهري*");
+    lines.push(
+      `الحفظ الجديد: ${formatPages(report.hifz.totalMemPages)}${report.hifz.expectedPages > 0 ? ` من ${formatPages(report.hifz.expectedPages)}` : ""}`
+    );
+    lines.push(
+      `المراجعة: ${formatPages(report.hifz.totalRevisionPages)}${report.hifz.expectedRevisionPages > 0 ? ` من ${formatPages(report.hifz.expectedRevisionPages)}` : ""}`
+    );
+    if (report.hifz.grade) lines.push(`تقييم الحفظ: ${GRADE_LABELS_AR[report.hifz.grade]}`);
+    if (report.hifz.revGrade) lines.push(`تقييم المراجعة: ${GRADE_LABELS_AR[report.hifz.revGrade]}`);
+    if (report.hifz.notes) lines.push(`ملاحظات: ${report.hifz.notes}`);
+  }
+
+  if (report.evaluations?.length) {
+    const avg = (report.evaluations.reduce((s, e) => s + e.rating, 0) / report.evaluations.length).toFixed(1);
+    lines.push("");
+    lines.push(`⭐ *متوسط التقييم*: ${avg} / 5`);
+  }
+
+  if (report.tests?.length) {
+    lines.push("");
+    lines.push("📝 *الاختبارات*");
+    report.tests.forEach((t) => {
+      lines.push(`${t.title || (t.type === "weekly" ? "اختبار أسبوعي" : "اختبار شهري")}: ${t.score}/${t.maxScore}`);
+    });
+  }
+
+  lines.push("");
+  lines.push("بارك الله فيكم، ونسأل الله أن يوفق أبناءنا لحفظ كتابه الكريم.");
+
+  return lines.join("\n");
 };
 
 const Reports = () => {
@@ -285,7 +346,21 @@ const Reports = () => {
 
       {report && (
         <div className="print:block">
-          <div className="flex justify-end mb-4 print:hidden">
+          <div className="flex justify-end gap-2 mb-4 print:hidden">
+            {report.type === "student" && (
+              report.person?.guardianPhone ? (
+                <a
+                  className="btn-secondary"
+                  href={`https://wa.me/${toWhatsAppNumber(report.person.guardianPhone)}?text=${encodeURIComponent(buildWhatsAppMessage(report, `شهر ${monthLabel(month)}`))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  📱 إرسال لولي الأمر واتساب
+                </a>
+              ) : (
+                <span className="text-xs text-sand-400 self-center">لا يوجد رقم واتساب مسجل لولي الأمر</span>
+              )
+            )}
             <button className="btn-primary" onClick={() => window.print()}>🖨️ طباعة التقرير</button>
           </div>
 
@@ -293,7 +368,7 @@ const Reports = () => {
             <div className="flex items-center gap-4 border-b-2 border-primary-600 pb-4 mb-6">
               <img src={logoSrc} alt="الشعار" className="w-16 h-16 rounded-full object-cover border border-sand-200" />
               <div>
-                <h2 className="text-xl font-bold text-sand-900">{settings?.heroTitle || "جمعية الكوم الخيرية بعزبة الكوم"}</h2>
+                <h2 className="text-xl font-bold text-sand-900">{settings?.heroTitle || "جمعية العلوم الخيرية بعزبة الكوم"}</h2>
                 <p className="text-sand-500 text-sm">تقرير شهري {reportTitle} — {monthLabel(month)}</p>
               </div>
             </div>
@@ -332,18 +407,18 @@ const Reports = () => {
                         <div className="bg-primary-50 rounded-xl px-3 py-2 text-center">
                           <p className="text-xs text-primary-600 mb-1">📖 الحفظ الجديد</p>
                           <p className="text-lg font-extrabold text-primary-700">
-                            {formatPagesOrJuz(report.hifz.totalMemPages)}
+                            {formatPages(report.hifz.totalMemPages)}
                             {report.hifz.expectedPages > 0 && (
-                              <span className="text-xs font-normal text-primary-500"> من {formatPagesOrJuz(report.hifz.expectedPages)}</span>
+                              <span className="text-xs font-normal text-primary-500"> من {formatPages(report.hifz.expectedPages)}</span>
                             )}
                           </p>
                         </div>
                         <div className="bg-sand-100 rounded-xl px-3 py-2 text-center">
                           <p className="text-xs text-sand-500 mb-1">🔄 المراجعة</p>
                           <p className="text-lg font-extrabold text-sand-700">
-                            {formatPagesOrJuz(report.hifz.totalRevisionPages)}
+                            {formatPages(report.hifz.totalRevisionPages)}
                             {report.hifz.expectedRevisionPages > 0 && (
-                              <span className="text-xs font-normal text-sand-500"> من {formatPagesOrJuz(report.hifz.expectedRevisionPages)}</span>
+                              <span className="text-xs font-normal text-sand-500"> من {formatPages(report.hifz.expectedRevisionPages)}</span>
                             )}
                           </p>
                         </div>
