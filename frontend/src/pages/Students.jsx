@@ -37,7 +37,9 @@ const Students = () => {
   const [photoPreview, setPhotoPreview] = useState("");
   const [savingPhoto, setSavingPhoto] = useState(false);
 
-  const canEdit = user.role !== "employee";
+  const canEdit = true; // المدرس بقى يقدر يعدّل بيانات الطلاب
+  const canDelete = user.role !== "employee"; // بس مسموحلوش يحذف
+  const canAdd = true; // المدرس (employee) بقى يقدر يضيف طلاب برضو
 
   const load = () => {
     setLoading(true);
@@ -150,7 +152,7 @@ const Students = () => {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-sand-900">إدارة الطلاب</h1>
-        {canEdit && (
+        {canAdd && (
           <button className="btn-primary" onClick={openCreate}>
             + إضافة طالب
           </button>
@@ -223,7 +225,9 @@ const Students = () => {
                     <td>
                       <div className="flex gap-2">
                         <button className="btn-ghost" onClick={() => openEdit(s)}>تعديل</button>
-                        <button className="btn-ghost text-red-500" onClick={() => setDeleteId(s._id)}>حذف</button>
+                        {canDelete && (
+                          <button className="btn-ghost text-red-500" onClick={() => setDeleteId(s._id)}>حذف</button>
+                        )}
                       </div>
                     </td>
                   )}
