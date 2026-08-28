@@ -29,6 +29,38 @@ router.get("/", async (req, res) => {
   res.json(students);
 });
 
+// تحديد "مجموعة" طلاب مدرس معين دفعة واحدة (بدل توزيع كل طالب لوحده)
+// studentIds = القائمة الكاملة المطلوب إسنادها للمدرس ده؛ أي طالب كان
+// متسجل عنده قبل كده وشيل من القائمة بيترفع منه المدرس تلقائيًا
+// ⚠️ لازم يفضل معرّف قبل "/:id" عشان Express متلخبطش بينهم
+router.put("/assign-teacher-group", async (req, res) => {
+  if (req.user.role === ROLES.EMPLOYEE) {
+    return res.status(403).json({ message: "ليس لديك صلاحية توزيع الطلاب" });
+  }
+  const { teacherId, studentIds } = req.body;
+  if (!teacherId || !Array.isArray(studentIds)) {
+    return res.status(400).json({ message: "بيانات ناقصة" });
+  }
+
+  const branchFilter = req.user.role === ROLES.SUPER_ADMIN ? {} : { branch: req.user.branch };
+
+  // شيل المدرس من أي طالب كان معينله قبل كده ومش موجود في القائمة الجديدة
+  await Student.updateMany(
+    { ...branchFilter, teacher: teacherId, _id: { $nin: studentIds } },
+    { teacher: null }
+  );
+  // عيّن المدرس لكل الطلاب في القائمة الجديدة
+  await Student.updateMany(
+    { ...branchFilter, _id: { $in: studentIds } },
+    { teacher: teacherId }
+  );
+
+  const group = await Student.find({ ...branchFilter, teacher: teacherId })
+    .populate("branch", "name")
+    .sort({ name: 1 });
+  res.json(group);
+});
+
 router.get("/:id", async (req, res) => {
   const student = await Student.findById(req.params.id).populate("branch", "name").populate("teacher", "name");
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
@@ -94,37 +126,6 @@ router.put("/:id/assign-teacher", async (req, res) => {
   student.teacher = teacherId || null;
   await student.save();
   res.json(student);
-});
-
-// تحديد "مجموعة" طلاب مدرس معين دفعة واحدة (بدل توزيع كل طالب لوحده)
-// studentIds = القائمة الكاملة المطلوب إسنادها للمدرس ده؛ أي طالب كان
-// متسجل عنده قبل كده وشيل من القائمة بيترفع منه المدرس تلقائيًا
-router.put("/assign-teacher-group", async (req, res) => {
-  if (req.user.role === ROLES.EMPLOYEE) {
-    return res.status(403).json({ message: "ليس لديك صلاحية توزيع الطلاب" });
-  }
-  const { teacherId, studentIds } = req.body;
-  if (!teacherId || !Array.isArray(studentIds)) {
-    return res.status(400).json({ message: "بيانات ناقصة" });
-  }
-
-  const branchFilter = req.user.role === ROLES.SUPER_ADMIN ? {} : { branch: req.user.branch };
-
-  // شيل المدرس من أي طالب كان معينله قبل كده ومش موجود في القائمة الجديدة
-  await Student.updateMany(
-    { ...branchFilter, teacher: teacherId, _id: { $nin: studentIds } },
-    { teacher: null }
-  );
-  // عيّن المدرس لكل الطلاب في القائمة الجديدة
-  await Student.updateMany(
-    { ...branchFilter, _id: { $in: studentIds } },
-    { teacher: teacherId }
-  );
-
-  const group = await Student.find({ ...branchFilter, teacher: teacherId })
-    .populate("branch", "name")
-    .sort({ name: 1 });
-  res.json(group);
 });
 
 // رفع صورة الطالب
