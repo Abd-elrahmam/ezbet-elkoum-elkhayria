@@ -14,7 +14,7 @@ const Footer = ({ whatsappNumber = "201021330018" }) => {
     <footer className="border-t border-sand-100 bg-white/80 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs sm:text-sm">
         <p className="text-sand-500">
-          © {new Date().getFullYear()} جمعية العلوم الخيرية بعزبة الكوم — جميع الحقوق محفوظة
+          © {new Date().getFullYear()} جمعية بلال بن رباح — جميع الحقوق محفوظة
         </p>
         <div className="flex items-center gap-2">
           <span className="text-sand-400">تم التصميم والتطوير بواسطة</span>
