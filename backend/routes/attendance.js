@@ -1,7 +1,20 @@
 const express = require("express");
 const Attendance = require("../models/Attendance");
+const Student = require("../models/Student");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
+
+// الموظف/المدرس يقدر يعدّل بس سجل حضور طالبه هو، أو سجل حضوره الشخصي هو نفسه.
+// مدير الفرع والأدمن الرئيسي مستثنيين من القيد ده (بيتحقق فرعهم في مكان الاستدعاء)
+const canEmployeeTouchRecord = async (req, record) => {
+  if (req.user.role !== ROLES.EMPLOYEE) return true;
+  if (record.employee && record.employee.toString() === req.user._id.toString()) return true;
+  if (record.student) {
+    const student = await Student.findById(record.student).select("teacher");
+    return !!student && student.teacher && student.teacher.toString() === req.user._id.toString();
+  }
+  return false;
+};
 
 const router = express.Router();
 router.use(protect);
@@ -61,6 +74,9 @@ router.put("/:id", async (req, res) => {
   if (req.user.role !== ROLES.SUPER_ADMIN && record.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل سجل من فرع آخر" });
   }
+  if (!(await canEmployeeTouchRecord(req, record))) {
+    return res.status(403).json({ message: "لا يمكنك تعديل سجل حضور لا يخصك" });
+  }
   Object.assign(record, req.body);
   await record.save();
   res.json(record);
@@ -71,6 +87,9 @@ router.delete("/:id", async (req, res) => {
   if (!record) return res.status(404).json({ message: "السجل غير موجود" });
   if (req.user.role !== ROLES.SUPER_ADMIN && record.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك حذف سجل من فرع آخر" });
+  }
+  if (!(await canEmployeeTouchRecord(req, record))) {
+    return res.status(403).json({ message: "لا يمكنك حذف سجل حضور لا يخصك" });
   }
   await record.deleteOne();
   res.json({ message: "تم حذف السجل" });

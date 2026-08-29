@@ -7,9 +7,32 @@ const connectDB = require("./config/db");
 
 const app = express();
 
+// السيرفر غالبًا هيشتغل خلف reverse proxy (Nginx/Apache) على الاستضافة،
+// فلازم Express يعرف ياخد IP العميل الحقيقي من هيدر X-Forwarded-For
+// (مهم عشان rate limiting على /api/auth/login يشتغل صح)
+app.set("trust proxy", 1);
+
 connectDB();
 
-app.use(cors({ origin: process.env.CLIENT_URL || "*", credentials: true }));
+// ملاحظة: مينفعش تستخدم origin: "*" مع credentials: true (المتصفح بيرفض الطلب أصلًا).
+// CLIENT_URL ممكن يكون رابط واحد أو أكتر مفصولين بفاصلة (مفيد لو عندك دومين وwww. مثلًا)
+const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // السماح بالطلبات اللي مفيهاش origin (زي Postman أو health checks)
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("غير مسموح لهذا المصدر بالوصول (CORS)"));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(morgan("dev"));
 

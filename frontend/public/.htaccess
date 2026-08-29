@@ -1,0 +1,16 @@
+# هذا الملف ضروري لو رفعت الفرونت إند (مجلد dist بعد البناء) على استضافة
+# Apache زي Hostinger. من غيره، أي تحديث للصفحة (F5) على مسار غير "/" زي
+# /dashboard أو /students هيرجع 404 لأن Apache بيدور على ملف فعلي بالاسم ده
+# مش موجود، بينما React Router محتاج كل المسارات ترجع لنفس index.html.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # لو الملف أو المجلد المطلوب موجود فعليًا (صور، JS، CSS...) قدّمه عادي
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # غير كده رجّع index.html وسيب React Router يتعامل مع المسار
+  RewriteRule . /index.html [L]
+</IfModule>

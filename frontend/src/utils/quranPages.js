@@ -2,8 +2,13 @@ import { SURAHS } from "./quranSurahs";
 
 export const QURAN_TOTAL_PAGES = 604;
 
-const PAGE_MAP_URL =
-  "https://raw.githubusercontent.com/Mushaf-Learning/quran-text/main/metadata/pages.json";
+// كان الملف بيتحمّل من رابط خارجي على GitHub (raw.githubusercontent.com).
+// تم تنزيله وحفظه محليًا في frontend/public/data/quran-pages.json عشان:
+// 1) التطبيق يشتغل حتى لو مفيش إنترنت خارجي أو GitHub بطيء/محجوب
+// 2) الأداء أسرع (ملف من نفس السيرفر بدل طرف ثالث)
+// 3) عدم الاعتماد على استمرار وجود ريبو خارجي في المستقبل
+// البيانات دي ثابتة (604 صفحة من المصحف العثماني) ومش هتتغير، فمفيش داعي لتحديثها من مصدر خارجي
+const PAGE_MAP_URL = "/data/quran-pages.json";
 
 let pageBoundaries = [];
 let initialized = false;

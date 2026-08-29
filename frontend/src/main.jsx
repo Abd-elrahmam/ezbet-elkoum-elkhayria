@@ -7,40 +7,26 @@ import { SettingsProvider } from "./context/SettingsContext.jsx";
 import { PeriodProvider } from "./context/PeriodContext.jsx";
 import { initQuranPages } from "./utils/quranPages";
 import "./index.css";
-async function startApp() {
-  try {
-    await initQuranPages();
 
-    ReactDOM.createRoot(
-      document.getElementById("root")
-    ).render(
-      <React.StrictMode>
-        <BrowserRouter>
-          <SettingsProvider>
-            <AuthProvider>
-              <PeriodProvider>
-                <App />
-              </PeriodProvider>
-            </AuthProvider>
-          </SettingsProvider>
-        </BrowserRouter>
-      </React.StrictMode>
-    );
-  } catch (error) {
-    console.error("Failed to initialize Quran pages:", error);
+// خريطة صفحات المصحف بقت ملف محلي (مش رابط خارجي)، فتحميلها سريع وموثوق.
+// مع ذلك، التطبيق كله ميتفهش لتحميلها: بيتم تحميلها في الخلفية بمجرد الإقلاع،
+// وصفحة "الحفظ الشهري" (الوحيدة اللي محتاجاها فعليًا) بتتأكد إنها جاهزة بنفسها
+// قبل ما تستخدمها (شوف initQuranPages() جوه Memorization.jsx). بالطريقة دي، أي
+// مشكلة مستقبلية في تحميل الملف ده هتأثر بس على صفحة الحفظ، مش على التطبيق كله.
+initQuranPages().catch((error) => {
+  console.error("تعذر تحميل خريطة صفحات المصحف:", error);
+});
 
-    document.getElementById("root").innerHTML = `
-      <div style="
-        padding: 40px;
-        text-align: center;
-        direction: rtl;
-        font-family: sans-serif;
-      ">
-        <h2>تعذر تحميل بيانات صفحات المصحف</h2>
-        <p>تأكد من اتصال الإنترنت ثم أعد تحميل الصفحة.</p>
-      </div>
-    `;
-  }
-}
-
-startApp();
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <SettingsProvider>
+        <AuthProvider>
+          <PeriodProvider>
+            <App />
+          </PeriodProvider>
+        </AuthProvider>
+      </SettingsProvider>
+    </BrowserRouter>
+  </React.StrictMode>
+);

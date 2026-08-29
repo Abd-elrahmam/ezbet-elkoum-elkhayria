@@ -3,7 +3,15 @@ const Student = require("../models/Student");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
 const upload = require("../middleware/upload");
-const { fileToDataUri } = upload;
+const fs = require("fs");
+const path = require("path");
+
+// حذف صورة قديمة من على القرص (لو موجودة) قبل استبدالها أو مسحها نهائيًا
+const deleteOldPhoto = (photoUrl) => {
+  if (!photoUrl || !photoUrl.startsWith("/uploads/")) return;
+  const filePath = path.join(__dirname, "..", photoUrl);
+  fs.unlink(filePath, () => {});
+};
 
 const router = express.Router();
 router.use(protect);
@@ -64,6 +72,12 @@ router.put("/assign-teacher-group", async (req, res) => {
 router.get("/:id", async (req, res) => {
   const student = await Student.findById(req.params.id).populate("branch", "name").populate("teacher", "name");
   if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
+  if (req.user.role !== ROLES.SUPER_ADMIN && student.branch._id.toString() !== req.user.branch.toString()) {
+    return res.status(403).json({ message: "لا يمكنك عرض طالب من فرع آخر" });
+  }
+  if (req.user.role === ROLES.EMPLOYEE && student.teacher?._id?.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ message: "لا يمكنك عرض طالب غير مسؤول عنه" });
+  }
   res.json(student);
 });
 
@@ -136,7 +150,8 @@ router.put("/:id/photo", upload.single("photo"), async (req, res) => {
   if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
   }
-  student.photoUrl = fileToDataUri(req.file);
+  deleteOldPhoto(student.photoUrl);
+  student.photoUrl = `/uploads/${req.file.filename}`;
   await student.save();
   res.json(student);
 });
@@ -148,6 +163,7 @@ router.delete("/:id/photo", async (req, res) => {
   if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
   }
+  deleteOldPhoto(student.photoUrl);
   student.photoUrl = "";
   await student.save();
   res.json(student);

@@ -3,7 +3,12 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { usePeriod, MONTH_NAMES } from "../context/PeriodContext";
 import { SURAHS } from "../utils/quranSurahs";
-import { computePagesRange, surahNameByNumber } from "../utils/quranPages";
+import {
+  computePagesRange,
+  surahNameByNumber,
+  initQuranPages,
+  isQuranPagesReady,
+} from "../utils/quranPages";
 import { formatPagesOrJuz, autoGradeFromPercent } from "../utils/quran";
 import Modal from "../components/Modal";
 
@@ -123,6 +128,22 @@ const Memorization = () => {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
 
+  // خريطة صفحات المصحف بتتحمّل في الخلفية من main.jsx، وهنا بنتأكد إنها
+  // جاهزة فعلًا قبل ما نسمح بحساب عدد الصفحات (عادةً سريعة جدًا لأنها ملف محلي)
+  const [pagesReady, setPagesReady] = useState(isQuranPagesReady());
+  useEffect(() => {
+    if (pagesReady) return;
+    let cancelled = false;
+    initQuranPages()
+      .then(() => {
+        if (!cancelled) setPagesReady(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pagesReady]);
+
   useEffect(() => {
     if (!monthTouched) {
       setMonth(activeMonth);
@@ -218,6 +239,7 @@ const Memorization = () => {
 
     let memPages = 0;
     if (
+      pagesReady &&
       draft.status === "normal" &&
       draft.memFromSurah &&
       draft.memFromAyah &&
@@ -232,7 +254,7 @@ const Memorization = () => {
       ).pagesCount;
     }
     let revPages = 0;
-    if (draft.revFromSurah && draft.revToSurah) {
+    if (pagesReady && draft.revFromSurah && draft.revToSurah) {
       const toSurahInfo = SURAHS.find(
         (sr) => sr.number === Number(draft.revToSurah),
       );
@@ -262,7 +284,7 @@ const Memorization = () => {
       expectedRevisionPages,
       revPct,
     };
-  }, [draft, activeStudent, attendanceMap]);
+  }, [draft, activeStudent, attendanceMap, pagesReady]);
 
   // تحديث تقدير الحفظ تلقائيًا من نسبة الحفظ، إلا لو المستخدم اختار تقدير بنفسه
   useEffect(() => {
@@ -371,6 +393,9 @@ const Memorization = () => {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold text-sand-900">تسجيل الحفظ الشهري</h1>
+        {!pagesReady && (
+          <span className="text-xs text-sand-400">جارِ تجهيز بيانات صفحات المصحف...</span>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-3 mb-4 items-center">
