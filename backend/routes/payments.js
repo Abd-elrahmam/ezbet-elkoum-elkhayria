@@ -17,7 +17,11 @@ router.get("/", async (req, res) => {
   }
   if (req.query.department) filter.department = req.query.department;
   if (req.query.student) filter.student = req.query.student;
-  if (req.query.month) filter.month = req.query.month;
+  if (req.query.month) {
+    filter.month = req.query.month;
+  } else if (req.query.year) {
+    filter.month = new RegExp(`^${Number(req.query.year)}-`);
+  }
 
   const payments = await Payment.find(filter)
     .populate("student", "name")

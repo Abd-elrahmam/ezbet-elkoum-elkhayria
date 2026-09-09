@@ -21,7 +21,12 @@ router.get("/", async (req, res) => {
   if (req.query.department) filter.department = req.query.department;
   if (req.query.student) filter.student = req.query.student;
   if (req.query.employee) filter.employee = req.query.employee;
-  if (req.query.month) filter.month = req.query.month;
+  if (req.query.month) {
+    filter.month = req.query.month;
+  } else if (req.query.year) {
+    // month مخزّن كنص بصيغة "YYYY-MM" فبنعمل مطابقة بادئة السنة لجلب كل شهور السنة
+    filter.month = new RegExp(`^${Number(req.query.year)}-`);
+  }
 
   const records = await Hifz.find(filter)
     .populate("student", "name")
@@ -136,9 +141,11 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
                 ? Number(r.totalRevisionPages)
                 : revCalc.pagesCount || 0,
             revGrade: r.revGrade || null,
+            revGradeMode: r.revGradeMode === "manual" ? "manual" : "auto",
             mutoonFrom: r.mutoonFrom || "",
             mutoonTo: r.mutoonTo || "",
             grade: r.grade || null,
+            gradeMode: r.gradeMode === "manual" ? "manual" : "auto",
             notes: r.notes || "",
           },
           { upsert: true, new: true, setDefaultsOnInsert: true },

@@ -2,7 +2,7 @@ const express = require("express");
 const Evaluation = require("../models/Evaluation");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
-const { monthRange } = require("../utils/dateRange");
+const { monthRange, yearRange } = require("../utils/dateRange");
 
 const router = express.Router();
 router.use(protect);
@@ -19,6 +19,9 @@ router.get("/", async (req, res) => {
   if (req.query.period) filter.period = req.query.period;
   if (req.query.month) {
     const range = monthRange(req.query.month);
+    if (range) filter.date = { $gte: range.start, $lt: range.end };
+  } else if (req.query.year) {
+    const range = yearRange(req.query.year);
     if (range) filter.date = { $gte: range.start, $lt: range.end };
   }
 

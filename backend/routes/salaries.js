@@ -16,7 +16,11 @@ router.get("/", async (req, res) => {
     filter.employee = req.user._id; // الموظف يشوف مرتبه هو بس
   }
   if (req.query.employee && req.user.role !== ROLES.EMPLOYEE) filter.employee = req.query.employee;
-  if (req.query.month) filter.month = req.query.month;
+  if (req.query.month) {
+    filter.month = req.query.month;
+  } else if (req.query.year) {
+    filter.month = new RegExp(`^${Number(req.query.year)}-`);
+  }
 
   const salaries = await Salary.find(filter)
     .populate("employee", "name jobTitle")

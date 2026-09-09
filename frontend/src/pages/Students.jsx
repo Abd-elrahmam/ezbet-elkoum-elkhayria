@@ -132,7 +132,8 @@ const Students = () => {
       if (photoFile && studentId) {
         const fd = new FormData();
         fd.append("photo", photoFile);
-        await api.put(`/students/${studentId}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+        // متحطش Content-Type يدوي - axios بيحسبه لوحده مع الـ boundary الصح
+        await api.put(`/students/${studentId}/photo`, fd);
       }
       setModalOpen(false);
       load();

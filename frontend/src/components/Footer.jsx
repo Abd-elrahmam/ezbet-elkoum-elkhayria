@@ -1,4 +1,5 @@
 import React from "react";
+import { useSettings } from "../context/SettingsContext";
 
 const WhatsAppIcon = () => (
   <svg viewBox="0 0 32 32" className="w-5 h-5 fill-current">
@@ -10,11 +11,14 @@ const DEVELOPER_NAME = "عبدالرحمن فضل";
 const DEVELOPER_WHATSAPP = "201021330018"; // رقم ثابت، مش قابل للتعديل من لوحة الإعدادات
 
 const Footer = ({ whatsappNumber = "201021330018" }) => {
+  const { settings } = useSettings();
+  const associationName = settings?.heroTitle || "جمعية العلوم الخيرية بعزبة الكوم";
+
   return (
     <footer className="border-t border-sand-100 bg-white/80 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs sm:text-sm">
         <p className="text-sand-500">
-          © {new Date().getFullYear()} جمعية بلال بن رباح — جميع الحقوق محفوظة
+          © {new Date().getFullYear()} {associationName} — جميع الحقوق محفوظة
         </p>
         <div className="flex items-center gap-2">
           <span className="text-sand-400">تم التصميم والتطوير بواسطة</span>

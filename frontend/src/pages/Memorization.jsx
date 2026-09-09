@@ -196,11 +196,14 @@ const Memorization = () => {
           revToSurah: surahNumberByName(r.revToSurah),
           revDailyRatePages: r.revDailyRatePages ?? 0.5,
           revGrade: r.revGrade || "",
-          revGradeMode: r.revGrade ? "manual" : "auto",
+          // نقرأ الوضع المحفوظ فعليًا من قاعدة البيانات. لو السجل قديم من قبل
+          // إضافة الحقل ده (مفيهوش revGradeMode خالص)، نرجع للتخمين القديم
+          // كـ fallback بس (موجود تقييم = افتراض يدوي) عشان ميبوظش سجلات قديمة
+          revGradeMode: r.revGradeMode || (r.revGrade ? "manual" : "auto"),
           mutoonFrom: r.mutoonFrom || "",
           mutoonTo: r.mutoonTo || "",
           grade: r.grade || "",
-          gradeMode: r.grade ? "manual" : "auto",
+          gradeMode: r.gradeMode || (r.grade ? "manual" : "auto"),
           notes: r.notes || "",
         };
       });
@@ -355,9 +358,11 @@ const Memorization = () => {
           expectedRevisionPages: draftCalc.expectedRevisionPages, // ⬅️ جديد
           totalRevisionPages: draftCalc.revPages, // ⬅️ جديد
           revGrade: draft.revGrade || null,
+          revGradeMode: draft.revGradeMode === "manual" ? "manual" : "auto",
           mutoonFrom: draft.mutoonFrom || "",
           mutoonTo: draft.mutoonTo || "",
           grade: draft.grade || null,
+          gradeMode: draft.gradeMode === "manual" ? "manual" : "auto",
           notes: draft.notes || "",
         },
       ];

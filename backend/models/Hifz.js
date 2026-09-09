@@ -40,12 +40,17 @@ const hifzSchema = new mongoose.Schema(
     expectedRevisionPages: { type: Number, min: 0, default: null },
     totalRevisionPages: { type: Number, min: 0, default: 0 },
     revGrade: { type: String, enum: [...GRADES, null], default: null }, // تقييم المراجعة (منفصل عن تقييم الحفظ)
+    // بيحفظ هل التقييم ده اتحط تلقائيًا من النسبة ولا المستخدم اختاره بنفسه.
+    // مهم عشان لما تفتح السجل تاني، النظام يعرف يكمل التحديث التلقائي بدل
+    // ما يفترض غلط إن أي تقييم موجود يبقى "يدوي" لمجرد إنه له قيمة محفوظة
+    revGradeMode: { type: String, enum: ["auto", "manual"], default: "auto" },
 
     // المتون (لبعض الحلقات بتحفظ متون بجانب القرآن)
     mutoonFrom: { type: String, trim: true, default: "" },
     mutoonTo: { type: String, trim: true, default: "" },
 
     grade: { type: String, enum: [...GRADES, null], default: null }, // تقييم الحفظ الجديد
+    gradeMode: { type: String, enum: ["auto", "manual"], default: "auto" },
     notes: { type: String, trim: true, default: "" },
   },
   { timestamps: true }

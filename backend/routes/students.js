@@ -3,15 +3,7 @@ const Student = require("../models/Student");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
 const upload = require("../middleware/upload");
-const fs = require("fs");
-const path = require("path");
-
-// حذف صورة قديمة من على القرص (لو موجودة) قبل استبدالها أو مسحها نهائيًا
-const deleteOldPhoto = (photoUrl) => {
-  if (!photoUrl || !photoUrl.startsWith("/uploads/")) return;
-  const filePath = path.join(__dirname, "..", photoUrl);
-  fs.unlink(filePath, () => {});
-};
+const { fileToDataUri } = upload;
 
 const router = express.Router();
 router.use(protect);
@@ -37,10 +29,30 @@ router.get("/", async (req, res) => {
   res.json(students);
 });
 
+router.get("/:id", async (req, res) => {
+  const student = await Student.findById(req.params.id).populate("branch", "name").populate("teacher", "name");
+  if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
+  res.json(student);
+});
+
+router.post("/", scopeToOwnBranch, async (req, res) => {
+  try {
+    // المدرس يقدر يضيف طالب، وبيتحط تلقائيًا كمدرس ليه لو محددش مدرس تاني
+    if (req.user.role === ROLES.EMPLOYEE && !req.body.teacher) {
+      req.body.teacher = req.user._id;
+    }
+    const student = await Student.create(req.body);
+    res.status(201).json(student);
+  } catch (err) {
+    res.status(400).json({ message: "فشل إضافة الطالب", error: err.message });
+  }
+});
+
 // تحديد "مجموعة" طلاب مدرس معين دفعة واحدة (بدل توزيع كل طالب لوحده)
 // studentIds = القائمة الكاملة المطلوب إسنادها للمدرس ده؛ أي طالب كان
 // متسجل عنده قبل كده وشيل من القائمة بيترفع منه المدرس تلقائيًا
-// ⚠️ لازم يفضل معرّف قبل "/:id" عشان Express متلخبطش بينهم
+// ملحوظة: لازم يترسم قبل أي route فيه /:id، وإلا Express هيدور على
+// طالب رقمه الحرفي "assign-teacher-group" ويرجّع خطأ غلط
 router.put("/assign-teacher-group", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) {
     return res.status(403).json({ message: "ليس لديك صلاحية توزيع الطلاب" });
@@ -67,31 +79,6 @@ router.put("/assign-teacher-group", async (req, res) => {
     .populate("branch", "name")
     .sort({ name: 1 });
   res.json(group);
-});
-
-router.get("/:id", async (req, res) => {
-  const student = await Student.findById(req.params.id).populate("branch", "name").populate("teacher", "name");
-  if (!student) return res.status(404).json({ message: "الطالب غير موجود" });
-  if (req.user.role !== ROLES.SUPER_ADMIN && student.branch._id.toString() !== req.user.branch.toString()) {
-    return res.status(403).json({ message: "لا يمكنك عرض طالب من فرع آخر" });
-  }
-  if (req.user.role === ROLES.EMPLOYEE && student.teacher?._id?.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ message: "لا يمكنك عرض طالب غير مسؤول عنه" });
-  }
-  res.json(student);
-});
-
-router.post("/", scopeToOwnBranch, async (req, res) => {
-  try {
-    // المدرس يقدر يضيف طالب، وبيتحط تلقائيًا كمدرس ليه لو محددش مدرس تاني
-    if (req.user.role === ROLES.EMPLOYEE && !req.body.teacher) {
-      req.body.teacher = req.user._id;
-    }
-    const student = await Student.create(req.body);
-    res.status(201).json(student);
-  } catch (err) {
-    res.status(400).json({ message: "فشل إضافة الطالب", error: err.message });
-  }
 });
 
 router.put("/:id", scopeToOwnBranch, async (req, res) => {
@@ -150,8 +137,7 @@ router.put("/:id/photo", upload.single("photo"), async (req, res) => {
   if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
   }
-  deleteOldPhoto(student.photoUrl);
-  student.photoUrl = `/uploads/${req.file.filename}`;
+  student.photoUrl = fileToDataUri(req.file);
   await student.save();
   res.json(student);
 });
@@ -163,7 +149,6 @@ router.delete("/:id/photo", async (req, res) => {
   if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
   }
-  deleteOldPhoto(student.photoUrl);
   student.photoUrl = "";
   await student.save();
   res.json(student);
