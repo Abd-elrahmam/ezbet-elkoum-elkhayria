@@ -13,10 +13,7 @@ frontend/.env
 frontend/.env.example
 
 backend/.env
-backend/.env
 .env
-
-backend/.env.example
 backend/.env.example
 .env.example
 
