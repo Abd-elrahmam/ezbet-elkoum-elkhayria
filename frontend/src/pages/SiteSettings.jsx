@@ -51,10 +51,7 @@ const SiteSettings = () => {
     try {
       const fd = new FormData();
       fd.append(field, file);
-      // ملاحظة مهمة: متحطش Content-Type يدوي هنا! axios/المتصفح بيحسبوه
-      // تلقائيًا مع الـ boundary المطلوب لملفات FormData. لو حطيته يدوي
-      // من غير boundary، السيرفر (multer) مش هيقدر يقرأ الملف خالص.
-      await api.put(endpoint, fd);
+      await api.put(endpoint, fd, { headers: { "Content-Type": "multipart/form-data" } });
       reload();
       setMessage("تم رفع الصورة بنجاح ✅");
     } catch (err) {

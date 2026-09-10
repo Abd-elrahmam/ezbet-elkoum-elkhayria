@@ -2,7 +2,7 @@ const express = require("express");
 const Test = require("../models/Test");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
-const { monthRange, yearRange } = require("../utils/dateRange");
+const { monthRange } = require("../utils/dateRange");
 
 const router = express.Router();
 router.use(protect);
@@ -20,9 +20,6 @@ router.get("/", async (req, res) => {
   if (req.user.role === ROLES.EMPLOYEE) filter.examiner = req.user._id;
   if (req.query.month) {
     const range = monthRange(req.query.month);
-    if (range) filter.date = { $gte: range.start, $lt: range.end };
-  } else if (req.query.year) {
-    const range = yearRange(req.query.year);
     if (range) filter.date = { $gte: range.start, $lt: range.end };
   }
 

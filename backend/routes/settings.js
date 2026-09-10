@@ -38,7 +38,7 @@ router.put("/logo", protect, allowRoles(ROLES.SUPER_ADMIN), upload.single("logo"
   try {
     if (!req.file) return res.status(400).json({ message: "لم يتم إرسال أي صورة" });
     const settings = await getOrCreateSettings();
-    settings.logoUrl = `/uploads/${req.file.filename}`;
+    settings.logoUrl = req.file.path;
     await settings.save();
     res.json(settings);
   } catch (err) {
@@ -51,7 +51,7 @@ router.put("/hero-image", protect, allowRoles(ROLES.SUPER_ADMIN), upload.single(
   try {
     if (!req.file) return res.status(400).json({ message: "لم يتم إرسال أي صورة" });
     const settings = await getOrCreateSettings();
-    settings.heroImageUrl = `/uploads/${req.file.filename}`;
+    settings.heroImageUrl = req.file.path;
     await settings.save();
     res.json(settings);
   } catch (err) {

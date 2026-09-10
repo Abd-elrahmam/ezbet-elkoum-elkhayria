@@ -7,11 +7,4 @@ function monthRange(monthStr) {
   return { start: new Date(y, m - 1, 1), end: new Date(y, m, 1) };
 }
 
-// نفس الفكرة لكن لسنة كاملة (لتقارير سنوية) - بيقبل "2026" أو رقم
-function yearRange(yearVal) {
-  const y = Number(yearVal);
-  if (!y) return null;
-  return { start: new Date(y, 0, 1), end: new Date(y + 1, 0, 1) };
-}
-
-module.exports = { monthRange, yearRange };
+module.exports = { monthRange };

@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { usePeriod, MONTH_NAMES } from "../context/PeriodContext";
+import { useDepartmentAccess } from "../hooks/useDepartmentAccess";
 
-const MONTH_TOTAL_DAYS = 22;
+const MONTH_TOTAL_DAYS = 20;
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -23,9 +24,10 @@ const STATUS_COLORS = {
 const Attendance = () => {
   const { user } = useAuth();
   const { activeMonth, activeYear, isCustom } = usePeriod();
+  const deptAccess = useDepartmentAccess();
 
   const [tab, setTab] = useState("daily"); // daily | monthly
-  const [department, setDepartment] = useState("nursery");
+  const [department, setDepartment] = useState(deptAccess.department || "nursery");
   const [branches, setBranches] = useState([]);
   const [filterBranch, setFilterBranch] = useState("");
   const [search, setSearch] = useState("");
@@ -55,6 +57,13 @@ const Attendance = () => {
       setYear(activeYear);
     }
   }, [activeMonth, activeYear]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // لو المستخدم مقفول على قسم واحد بس، افرضه دايمًا
+  useEffect(() => {
+    if (deptAccess.locked && department !== deptAccess.department) {
+      setDepartment(deptAccess.department);
+    }
+  }, [deptAccess.locked, deptAccess.department]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (user.role === "super_admin") {
@@ -181,10 +190,16 @@ const Attendance = () => {
       </div>
 
       <div className="flex flex-wrap gap-3 mb-4 items-center">
-        <select className="input max-w-[160px]" value={department} onChange={(e) => setDepartment(e.target.value)}>
-          <option value="quran">الكتاب</option>
-          <option value="nursery">الحضانة</option>
-        </select>
+        {deptAccess.locked ? (
+          <span className="badge bg-primary-50 text-primary-700">
+            {department === "quran" ? "📖 الكتاب" : "🧸 الحضانة"}
+          </span>
+        ) : (
+          <select className="input max-w-[160px]" value={department} onChange={(e) => setDepartment(e.target.value)}>
+            <option value="quran">الكتاب</option>
+            <option value="nursery">الحضانة</option>
+          </select>
+        )}
 
         {user.role === "super_admin" && (
           <select className="input max-w-[200px]" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
@@ -283,7 +298,7 @@ const Attendance = () => {
       {tab === "monthly" && (
         <>
           <p className="text-xs text-sand-400 mb-3">
-            الشهر معتمد كـ 22 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 22).
+            الشهر معتمد كـ 20 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 20).
           </p>
           {summaryMessage && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{summaryMessage}</div>}
           <div className="card overflow-x-auto">

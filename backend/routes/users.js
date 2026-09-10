@@ -3,14 +3,6 @@ const User = require("../models/User");
 const { protect, allowRoles } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
 const upload = require("../middleware/upload");
-const fs = require("fs");
-const path = require("path");
-
-const deleteOldPhoto = (photoUrl) => {
-  if (!photoUrl || !photoUrl.startsWith("/uploads/")) return;
-  const filePath = path.join(__dirname, "..", photoUrl);
-  fs.unlink(filePath, () => {});
-};
 
 const router = express.Router();
 router.use(protect);
@@ -37,16 +29,6 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   const user = await User.findById(req.params.id).select("-password").populate("branch", "name");
   if (!user) return res.status(404).json({ message: "المستخدم غير موجود" });
-
-  if (req.user.role === ROLES.EMPLOYEE && user._id.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ message: "لا يمكنك عرض بيانات مستخدم آخر" });
-  }
-  if (
-    req.user.role === ROLES.BRANCH_MANAGER &&
-    (user.role === ROLES.SUPER_ADMIN || user.branch?._id?.toString() !== req.user.branch.toString())
-  ) {
-    return res.status(403).json({ message: "لا يمكنك عرض بيانات مستخدم من فرع آخر" });
-  }
   res.json(user);
 });
 
@@ -131,8 +113,7 @@ router.put("/:id/photo", allowRoles(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER), up
       return res.status(403).json({ message: "لا يمكنك تعديل هذا المستخدم" });
     }
   }
-  deleteOldPhoto(target.photoUrl);
-  target.photoUrl = `/uploads/${req.file.filename}`;
+  target.photoUrl = req.file.path;
   await target.save();
   res.json(target.toSafeObject());
 });
@@ -150,7 +131,6 @@ router.delete("/:id/photo", allowRoles(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER),
       return res.status(403).json({ message: "لا يمكنك تعديل هذا المستخدم" });
     }
   }
-  deleteOldPhoto(target.photoUrl);
   target.photoUrl = "";
   await target.save();
   res.json(target.toSafeObject());

@@ -115,8 +115,7 @@ const Employees = () => {
       if (photoFile && userId) {
         const fd = new FormData();
         fd.append("photo", photoFile);
-        // متحطش Content-Type يدوي - axios بيحسبه لوحده مع الـ boundary الصح
-        await api.put(`/users/${userId}/photo`, fd);
+        await api.put(`/users/${userId}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
       }
       setModalOpen(false);
       load();

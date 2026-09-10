@@ -3,7 +3,6 @@ import { NavLink, useNavigate, Link } from "react-router-dom";
 import { useAuth, ROLE_LABELS } from "../context/AuthContext";
 import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
 import Footer from "./Footer";
-import FloatingWhatsApp from "./FloatingWhatsApp";
 import PeriodPicker from "./PeriodPicker";
 
 const NAV_ITEMS = [
@@ -20,7 +19,7 @@ const NAV_ITEMS = [
   { to: "/leaves", label: "طلبات الإجازة", icon: "🗓️", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/payments", label: "المدفوعات", icon: "💵", roles: ["super_admin", "branch_manager"] },
   { to: "/expenses", label: "المصروفات", icon: "🧾", roles: ["super_admin", "branch_manager"] },
-  { to: "/salaries", label: "الرواتب", icon: "💰", roles: ["super_admin", "branch_manager"] },
+  { to: "/salaries", label: "الرواتب", icon: "💰", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/reports", label: "التقارير", icon: "📊", roles: ["super_admin", "branch_manager", "employee"] },
   { to: "/settings", label: "إعدادات الموقع", icon: "⚙️", roles: ["super_admin"] },
 ];
@@ -127,7 +126,6 @@ const Layout = ({ children }) => {
           <Footer whatsappNumber={settings?.whatsappNumber} />
         </div>
       </div>
-      <FloatingWhatsApp whatsappNumber={settings?.whatsappNumber} />
     </div>
   );
 };

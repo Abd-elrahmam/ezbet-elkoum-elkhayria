@@ -1,16 +1,18 @@
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloudinary");
 
-const uploadsDir = path.join(__dirname, "..", "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".jpg";
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    cb(null, unique);
+// كل الصور (الشعار، صورة الهيرو، صور الموظفين، صور الطلاب) بترفع مباشرة
+// على Cloudinary بدل ما تتخزن على قرص السيرفر (اللي بيتمسح على Render/Railway)
+// أو جوه الداتابيز نفسها (اللي كانت بتتقل بالـ base64). Cloudinary مجاني
+// لحد حجم معقول وبيفضل ثابت مهما حصل للسيرفر.
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "bilal-elkhayria", // كل صور الموقع بتتحط في مجلد واحد منظم على Cloudinary
+    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+    // تصغير أي صورة أكبر من 1200x1200 تلقائيًا عشان توفير المساحة وسرعة التحميل
+    transformation: [{ width: 1200, height: 1200, crop: "limit" }],
   },
 });
 

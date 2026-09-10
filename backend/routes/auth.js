@@ -1,6 +1,5 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const rateLimit = require("express-rate-limit");
 const User = require("../models/User");
 const { protect } = require("../middleware/auth");
 
@@ -11,17 +10,8 @@ const signToken = (id) =>
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 
-// حماية من محاولات تخمين كلمة المرور (brute-force): 10 محاولات كحد أقصى كل 15 دقيقة لكل IP
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { message: "محاولات تسجيل دخول كثيرة جدًا، حاول مرة أخرى بعد قليل" },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 // تسجيل الدخول
-router.post("/login", loginLimiter, async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {

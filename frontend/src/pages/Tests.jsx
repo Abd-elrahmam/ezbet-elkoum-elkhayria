@@ -3,6 +3,7 @@ import api from "../api/axios";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
+import { useDepartmentAccess } from "../hooks/useDepartmentAccess";
 
 const emptyForm = {
   student: "",
@@ -17,6 +18,7 @@ const emptyForm = {
 
 const Tests = () => {
   const { user } = useAuth();
+  const deptAccess = useDepartmentAccess();
   const [tests, setTests] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +45,7 @@ const Tests = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, department: deptAccess.department || emptyForm.department });
     setError("");
     setModalOpen(true);
   };
@@ -158,10 +160,14 @@ const Tests = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">القسم</label>
-              <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
-                <option value="quran">الكتاب</option>
-                <option value="nursery">الحضانة</option>
-              </select>
+              {deptAccess.locked ? (
+                <div className="input bg-sand-50">{form.department === "quran" ? "📖 الكتاب" : "🧸 الحضانة"}</div>
+              ) : (
+                <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
+                  <option value="quran">الكتاب</option>
+                  <option value="nursery">الحضانة</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="label">النوع</label>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "../api/axios";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useDepartmentAccess } from "../hooks/useDepartmentAccess";
 
 const emptyForm = {
   category: "",
@@ -12,6 +13,7 @@ const emptyForm = {
 };
 
 const Expenses = () => {
+  const deptAccess = useDepartmentAccess();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -27,7 +29,7 @@ const Expenses = () => {
   useEffect(load, []);
 
   const openCreate = () => {
-    setForm(emptyForm);
+    setForm({ ...emptyForm, department: deptAccess.department || emptyForm.department });
     setError("");
     setModalOpen(true);
   };
@@ -112,8 +114,8 @@ const Expenses = () => {
               <label className="label">القسم</label>
               <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
                 <option value="general">عام</option>
-                <option value="quran">كتاب</option>
-                <option value="nursery">حضانة</option>
+                {(!deptAccess.locked || deptAccess.department === "quran") && <option value="quran">كتاب</option>}
+                {(!deptAccess.locked || deptAccess.department === "nursery") && <option value="nursery">حضانة</option>}
               </select>
             </div>
           </div>

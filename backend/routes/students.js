@@ -3,7 +3,6 @@ const Student = require("../models/Student");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
 const upload = require("../middleware/upload");
-const { fileToDataUri } = upload;
 
 const router = express.Router();
 router.use(protect);
@@ -137,7 +136,7 @@ router.put("/:id/photo", upload.single("photo"), async (req, res) => {
   if (req.user.role !== ROLES.SUPER_ADMIN && student.branch.toString() !== req.user.branch.toString()) {
     return res.status(403).json({ message: "لا يمكنك تعديل طالب من فرع آخر" });
   }
-  student.photoUrl = fileToDataUri(req.file);
+  student.photoUrl = req.file.path;
   await student.save();
   res.json(student);
 });

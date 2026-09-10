@@ -1,73 +1,86 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import { usePeriod, MONTH_NAMES } from "../context/PeriodContext";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const currentMonth = () => new Date().toISOString().slice(0, 7);
-
-const STATUS_LABELS = { present: "حاضر", absent: "غائب", late: "متأخر", excused: "مُعتذر" };
-const STATUS_COLORS = {
-  present: "bg-primary-50 text-primary-700",
-  absent: "bg-red-50 text-red-600",
-  late: "bg-amber-50 text-amber-600",
-  excused: "bg-sand-100 text-sand-700",
-};
+const MONTH_TOTAL_DAYS = 22; // شهر الموظفين 22 يوم عمل (بدل 20 للطلاب)
 
 const EmployeeAttendance = () => {
   const { user } = useAuth();
-  const canManage = user.role !== "employee";
+  const { activeMonth, activeYear, isCustom } = usePeriod();
 
-  const [date, setDate] = useState(todayStr());
+  const [branches, setBranches] = useState([]);
+  const [filterBranch, setFilterBranch] = useState("");
+  const [search, setSearch] = useState("");
+
   const [employees, setEmployees] = useState([]);
-  const [statuses, setStatuses] = useState({});
+  const [month, setMonth] = useState(activeMonth);
+  const [year, setYear] = useState(activeYear);
+  const [monthTouched, setMonthTouched] = useState(false);
+  const [summary, setSummary] = useState({}); // employeeId -> { presentDays, absentDays }
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filterMonth, setFilterMonth] = useState(currentMonth());
-
   useEffect(() => {
-    if (canManage) {
-      api.get("/users", { params: { role: "employee" } }).then((res) => setEmployees(res.data));
+    if (!monthTouched) {
+      setMonth(activeMonth);
+      setYear(activeYear);
     }
-  }, []);
+  }, [activeMonth, activeYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (canManage) {
-      api.get("/employee-attendance", { params: { date } }).then((res) => {
-        const map = {};
-        res.data.forEach((r) => { if (r.employee) map[r.employee._id] = r.status; });
-        setStatuses(map);
+    if (user.role === "super_admin") {
+      api.get("/branches").then((res) => setBranches(res.data));
+    }
+  }, [user.role]);
+
+  useEffect(() => {
+    const params = { role: "employee" };
+    if (filterBranch) params.branch = filterBranch;
+    api.get("/users", { params }).then((res) => setEmployees(res.data));
+  }, [filterBranch]);
+
+  useEffect(() => {
+    const params = { month, year };
+    if (filterBranch) params.branch = filterBranch;
+    api.get("/employee-monthly-attendance", { params }).then((res) => {
+      const map = {};
+      res.data.forEach((r) => {
+        if (r.employee) map[r.employee._id || r.employee] = { presentDays: r.presentDays, absentDays: r.absentDays };
       });
-    }
-  }, [date]);
+      setSummary(map);
+    });
+  }, [month, year, employees.length, filterBranch]);
 
-  const loadRecords = () => {
-    setLoading(true);
-    const params = {};
-    if (filterMonth) params.month = filterMonth;
-    api.get("/employee-attendance", { params }).then((res) => setRecords(res.data)).finally(() => setLoading(false));
+  // تعديل الحضور أو الغياب بيحسب التاني تلقائي (المجموع = 22 يوم)
+  const setSummaryField = (employeeId, field, value) => {
+    let num = value === "" ? "" : Math.max(0, Math.min(MONTH_TOTAL_DAYS, Number(value)));
+    setSummary((prev) => {
+      const other = field === "presentDays" ? "absentDays" : "presentDays";
+      const otherVal = num === "" ? "" : MONTH_TOTAL_DAYS - num;
+      return { ...prev, [employeeId]: { ...prev[employeeId], [field]: num, [other]: otherVal } };
+    });
   };
-  useEffect(loadRecords, [filterMonth]);
 
-  const setStatus = (employeeId, status) => {
-    setStatuses((prev) => ({ ...prev, [employeeId]: status }));
-  };
-
-  const handleSaveAll = async () => {
+  const handleSave = async () => {
     setSaving(true);
     setMessage("");
     try {
-      const payload = employees.map((e) => ({
-        employee: e._id,
-        branch: e.branch?._id || e.branch,
-        date,
-        status: statuses[e._id] || "present",
-      }));
-      await api.post("/employee-attendance/bulk", { records: payload });
+      const payload = employees.map((emp) => {
+        const rec = summary[emp._id] || {};
+        const present = rec.presentDays === "" || rec.presentDays == null ? 0 : rec.presentDays;
+        const absent = rec.absentDays === "" || rec.absentDays == null ? MONTH_TOTAL_DAYS - present : rec.absentDays;
+        return {
+          employee: emp._id,
+          branch: emp.branch?._id || emp.branch,
+          month,
+          year,
+          presentDays: present,
+          absentDays: absent,
+        };
+      });
+      await api.post("/employee-monthly-attendance/bulk", { records: payload });
       setMessage("تم حفظ حضور الموظفين بنجاح ✅");
-      loadRecords();
     } catch (err) {
       setMessage(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
     } finally {
@@ -75,98 +88,103 @@ const EmployeeAttendance = () => {
     }
   };
 
+  const filteredEmployees = useMemo(
+    () => employees.filter((e) => e.name.toLowerCase().includes(search.toLowerCase())),
+    [employees, search]
+  );
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-sand-900 mb-6">حضور وغياب الموظفين (يومي)</h1>
-
-      {canManage && (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <input type="date" className="input max-w-[200px]" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-
-          {message && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{message}</div>}
-
-          <div className="card overflow-x-auto mb-6">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>اسم الموظف</th>
-                  <th>الوظيفة</th>
-                  <th>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map((e) => (
-                  <tr key={e._id}>
-                    <td className="font-semibold">{e.name}</td>
-                    <td>{e.jobTitle || "—"}</td>
-                    <td>
-                      <div className="flex gap-1 flex-wrap">
-                        {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => setStatus(e._id, key)}
-                            className={`badge cursor-pointer border ${
-                              (statuses[e._id] || "present") === key
-                                ? STATUS_COLORS[key] + " border-transparent"
-                                : "bg-white text-sand-400 border-sand-200"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {employees.length === 0 && (
-                  <tr><td colSpan={3} className="text-center text-sand-400 py-8">لا يوجد موظفون</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {employees.length > 0 && (
-            <button className="btn-primary mb-8" onClick={handleSaveAll} disabled={saving}>
-              {saving ? "جارِ الحفظ..." : "حفظ حضور اليوم"}
-            </button>
-          )}
-        </>
-      )}
-
-      <h2 className="font-bold text-sand-800 mb-3">{canManage ? "سجل الحضور" : "سجل حضوري"}</h2>
-      <div className="flex gap-3 mb-4">
-        <input type="month" className="input max-w-[180px]" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} />
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h1 className="text-2xl font-bold text-sand-900">حضور وغياب الموظفين</h1>
       </div>
-      <div className="card overflow-x-auto">
-        {loading ? (
-          <p className="text-sand-500 p-4">جارِ التحميل...</p>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                {canManage && <th>الموظف</th>}
-                <th>التاريخ</th>
-                <th>الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((r) => (
-                <tr key={r._id}>
-                  {canManage && <td className="font-semibold">{r.employee?.name}</td>}
-                  <td>{r.date?.slice(0, 10)}</td>
-                  <td><span className={`badge ${STATUS_COLORS[r.status]}`}>{STATUS_LABELS[r.status]}</span></td>
-                </tr>
-              ))}
-              {records.length === 0 && (
-                <tr><td colSpan={canManage ? 3 : 2} className="text-center text-sand-400 py-8">لا توجد سجلات</td></tr>
-              )}
-            </tbody>
-          </table>
+
+      <div className="flex flex-wrap gap-3 mb-4 items-center">
+        {user.role === "super_admin" && (
+          <select className="input max-w-[200px]" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
+            <option value="">كل الفروع</option>
+            {branches.map((b) => (
+              <option key={b._id} value={b._id}>{b.name}</option>
+            ))}
+          </select>
         )}
+
+        <input className="input max-w-xs" placeholder="بحث بالاسم..." value={search} onChange={(e) => setSearch(e.target.value)} />
+
+        <div className="flex gap-2 items-center">
+          <select className="input" value={month} onChange={(e) => { setMonth(Number(e.target.value)); setMonthTouched(true); }}>
+            {MONTH_NAMES.map((m, i) => (
+              <option key={i + 1} value={i + 1}>{m}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            className="input w-24"
+            value={year}
+            onChange={(e) => { setYear(Number(e.target.value)); setMonthTouched(true); }}
+          />
+          {isCustom && !monthTouched && (
+            <span className="text-xs text-primary-700 bg-primary-50 rounded-full px-2 py-1">مأخوذ من الشهر المحدد أعلى الصفحة</span>
+          )}
+        </div>
       </div>
+
+      <p className="text-xs text-sand-400 mb-3">
+        شهر الموظفين معتمد كـ 22 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 22).
+      </p>
+
+      {message && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{message}</div>}
+
+      <div className="card overflow-x-auto">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>اسم الموظف</th>
+              <th>أيام الحضور</th>
+              <th>أيام الغياب</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredEmployees.map((emp) => {
+              const rec = summary[emp._id] || {};
+              return (
+                <tr key={emp._id}>
+                  <td className="font-semibold">{emp.name}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      max={MONTH_TOTAL_DAYS}
+                      className="input w-24"
+                      value={rec.presentDays ?? ""}
+                      onChange={(e) => setSummaryField(emp._id, "presentDays", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      max={MONTH_TOTAL_DAYS}
+                      className="input w-24"
+                      value={rec.absentDays ?? ""}
+                      onChange={(e) => setSummaryField(emp._id, "absentDays", e.target.value)}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+            {filteredEmployees.length === 0 && (
+              <tr><td colSpan={3} className="text-center text-sand-400 py-8">لا يوجد موظفون مطابقون</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {filteredEmployees.length > 0 && (
+        <button className="btn-primary mt-4" onClick={handleSave} disabled={saving}>
+          {saving ? "جارِ الحفظ..." : "حفظ حضور الموظفين"}
+        </button>
+      )}
     </div>
   );
 };

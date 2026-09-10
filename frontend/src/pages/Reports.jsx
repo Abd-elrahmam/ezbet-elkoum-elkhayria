@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
 import { formatPagesOrJuz } from "../utils/quran";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -115,6 +117,36 @@ const buildWhatsAppMessage = (report, monthText) => {
     });
   }
 
+  lines.push("");
+  lines.push("بارك الله فيكم، ونسأل الله أن يوفق أبناءنا لحفظ كتابه الكريم.");
+
+  return lines.join("\n");
+};
+
+// نص رسالة الواتساب للتقرير السنوي - ملخص مختصر لأن التفاصيل كلها هتكون في ملف الـ PDF المرفق
+const buildAnnualWhatsAppMessage = (report) => {
+  const student = report.person;
+  const deptLabel = student?.department === "nursery" ? "الحضانة" : "الكتاب";
+  const branchName = student?.branch?.name || "";
+  const guardianName = student?.guardianName ? `سيد/ة ${student.guardianName}` : "ولي الأمر الكريم";
+  const months = report.months || [];
+
+  const totalPresent = months.reduce((s, d) => s + d.attendance.present, 0);
+  const totalAbsent = months.reduce((s, d) => s + d.attendance.absent, 0);
+  const totalMem = months.reduce((s, d) => s + (d.hifz?.totalMemPages || 0), 0);
+  const totalRev = months.reduce((s, d) => s + (d.hifz?.totalRevisionPages || 0), 0);
+
+  const lines = [];
+  lines.push(`السلام عليكم ${guardianName}`);
+  lines.push(`ولي أمر الطالب: ${student?.name || ""}`);
+  lines.push(`هذا التقرير السنوي لسنة ${report.year} من إدارة ${deptLabel}${branchName ? ` - فرع ${branchName}` : ""}`);
+  lines.push("");
+  lines.push(`📅 عدد الشهور المسجلة: ${months.length}`);
+  lines.push(`📋 إجمالي أيام الحضور: ${totalPresent} | إجمالي أيام الغياب: ${totalAbsent}`);
+  lines.push(`📖 إجمالي الحفظ الجديد: ${formatPagesOrJuz(totalMem)}`);
+  lines.push(`🔁 إجمالي المراجعة: ${formatPagesOrJuz(totalRev)}`);
+  lines.push("");
+  lines.push("📎 تقرير تفصيلي كامل لكل شهر على حدة مرفق في ملف PDF.");
   lines.push("");
   lines.push("بارك الله فيكم، ونسأل الله أن يوفق أبناءنا لحفظ كتابه الكريم.");
 
@@ -257,6 +289,8 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [report, setReport] = useState(null);
+  const reportRef = useRef(null);
+  const [sendingPdf, setSendingPdf] = useState(false);
 
   useEffect(() => {
     if (user.role === "employee" && reportType !== "student") setReportType("student");
@@ -332,6 +366,45 @@ const Reports = () => {
       setError(err.response?.data?.message || "حدث خطأ أثناء تجهيز التقرير");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // تحميل التقرير كـ PDF (باستخدام صورة من نفس التقرير المطبوع) + فتح واتساب برسالة ملخصة
+  // ملحوظة مهمة: واتساب مفيش فيه رابط بيرفق ملف تلقائي، فالخطوة العملية هي:
+  // 1) الملف بينزل تلقائي على جهازك، 2) واتساب بيتفتح على نفس الطالب برسالة جاهزة،
+  // 3) وأنت ترفق ملف الـ PDF اللي نزل يدويًا جوه محادثة الواتساب قبل ما تبعت.
+  const handleSendAnnualPdf = async () => {
+    if (!reportRef.current || !report?.person?.guardianPhone) return;
+    setSendingPdf(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, { scale: 2, backgroundColor: "#ffffff" });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const fileName = `تقرير-${report.person.name}-${report.year}.pdf`;
+      pdf.save(fileName);
+
+      const waLink = `https://wa.me/${toWhatsAppNumber(report.person.guardianPhone)}?text=${encodeURIComponent(buildAnnualWhatsAppMessage(report))}`;
+      window.open(waLink, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError("تعذر إنشاء ملف الـ PDF، جرّب تاني");
+    } finally {
+      setSendingPdf(false);
     }
   };
 
@@ -435,10 +508,24 @@ const Reports = () => {
                 <span className="text-xs text-sand-400 self-center">لا يوجد رقم واتساب مسجل لولي الأمر</span>
               )
             )}
+            {report.mode === "annual" && report.type === "student" && (
+              report.person?.guardianPhone ? (
+                <button className="btn-secondary" onClick={handleSendAnnualPdf} disabled={sendingPdf}>
+                  {sendingPdf ? "جارِ التجهيز..." : "📱 إرسال لولي الأمر (PDF + رسالة)"}
+                </button>
+              ) : (
+                <span className="text-xs text-sand-400 self-center">لا يوجد رقم واتساب مسجل لولي الأمر</span>
+              )
+            )}
             <button className="btn-primary" onClick={() => window.print()}>🖨️ طباعة التقرير</button>
           </div>
+          {report.mode === "annual" && report.type === "student" && report.person?.guardianPhone && (
+            <p className="text-xs text-sand-400 -mt-3 mb-4 print:hidden">
+              هيتنزّل ملف PDF على جهازك تلقائيًا، وهيتفتح واتساب برسالة جاهزة لولي الأمر — كل اللي عليك إنك ترفق ملف الـ PDF اللي نزل يدويًا جوه المحادثة قبل الإرسال (واتساب مفيش فيه رابط بيرفق ملفات أوتوماتيك).
+            </p>
+          )}
 
-          <div className="card print:shadow-none print:border-none print:p-0">
+          <div ref={reportRef} className="card print:shadow-none print:border-none print:p-0">
             <div className="flex items-center gap-4 border-b-2 border-primary-600 pb-4 mb-6">
               <img src={logoSrc} alt="الشعار" className="w-16 h-16 rounded-full object-cover border border-sand-200" />
               <div>

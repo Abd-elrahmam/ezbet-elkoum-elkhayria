@@ -2,7 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
 import Footer from "../components/Footer";
-import FloatingWhatsApp from "../components/FloatingWhatsApp";
 
 const todayArabic = () =>
   new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -109,7 +108,6 @@ const LandingPage = () => {
 
       <div className="flex-1" />
       <Footer whatsappNumber={settings?.whatsappNumber} />
-      <FloatingWhatsApp whatsappNumber={settings?.whatsappNumber} />
     </div>
   );
 };

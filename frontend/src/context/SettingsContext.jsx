@@ -7,7 +7,9 @@ const API_ORIGIN = (import.meta.env.VITE_API_URL || "http://localhost:5000/api")
 
 export const resolveMediaUrl = (url) => {
   if (!url) return "";
-  if (url.startsWith("http")) return url;
+  // الصور الجديدة بتتخزن كـ base64 data URI مباشرة (data:image/...;base64,...)
+  // فمحتاجة ترجع زي ما هي من غير ما نحطلها API_ORIGIN قبلها
+  if (url.startsWith("http") || url.startsWith("data:")) return url;
   return `${API_ORIGIN}${url}`;
 };
 

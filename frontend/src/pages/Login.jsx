@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
 import Footer from "../components/Footer";
-import FloatingWhatsApp from "../components/FloatingWhatsApp";
 
 const Login = () => {
   const { settings } = useSettings();
@@ -73,7 +72,6 @@ const Login = () => {
       </div>
       </div>
       <Footer whatsappNumber={settings?.whatsappNumber} />
-      <FloatingWhatsApp whatsappNumber={settings?.whatsappNumber} />
     </div>
   );
 };

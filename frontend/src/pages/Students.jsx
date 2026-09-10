@@ -4,6 +4,7 @@ import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
 import { resolveMediaUrl } from "../context/SettingsContext";
+import { useDepartmentAccess } from "../hooks/useDepartmentAccess";
 
 const emptyForm = {
   name: "",
@@ -20,6 +21,7 @@ const emptyForm = {
 
 const Students = () => {
   const { user } = useAuth();
+  const deptAccess = useDepartmentAccess();
   const [students, setStudents] = useState([]);
   const [branches, setBranches] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -69,7 +71,11 @@ const Students = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, branch: user.role !== "super_admin" ? user.branch?._id || user.branch : "" });
+    setForm({
+      ...emptyForm,
+      branch: user.role !== "super_admin" ? user.branch?._id || user.branch : "",
+      department: deptAccess.department || emptyForm.department,
+    });
     setPhotoFile(null);
     setPhotoPreview("");
     setError("");
@@ -132,8 +138,7 @@ const Students = () => {
       if (photoFile && studentId) {
         const fd = new FormData();
         fd.append("photo", photoFile);
-        // متحطش Content-Type يدوي - axios بيحسبه لوحده مع الـ boundary الصح
-        await api.put(`/students/${studentId}/photo`, fd);
+        await api.put(`/students/${studentId}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
       }
       setModalOpen(false);
       load();
