@@ -119,7 +119,7 @@ const Attendance = () => {
         status: records[s._id] || "present",
       }));
       await api.post("/attendance/bulk", { records: payload });
-      setMessage("تم حفظ الحضور بنجاح ✅");
+      setMessage("تم حفظ الحضور بنجاح ");
     } catch (err) {
       setMessage(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
     } finally {
@@ -127,7 +127,7 @@ const Attendance = () => {
     }
   };
 
-  // تعديل الحضور أو الغياب بيحسب التاني تلقائي (المجموع = 20 يوم)
+  // تعديل الحضور أو الغياب بيحسب التاني تلقائي (المجموع = 22 يوم)
   const setSummaryField = (studentId, field, value) => {
     let num = value === "" ? "" : Math.max(0, Math.min(MONTH_TOTAL_DAYS, Number(value)));
     setSummary((prev) => {
@@ -156,7 +156,7 @@ const Attendance = () => {
         };
       });
       await api.post("/monthly-attendance/bulk", { records: payload });
-      setSummaryMessage("تم حفظ ملخص الحضور الشهري بنجاح ✅");
+      setSummaryMessage("تم حفظ ملخص الحضور الشهري بنجاح ");
     } catch (err) {
       setSummaryMessage(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
     } finally {
@@ -298,7 +298,7 @@ const Attendance = () => {
       {tab === "monthly" && (
         <>
           <p className="text-xs text-sand-400 mb-3">
-            الشهر معتمد كـ 20 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 20).
+            الشهر معتمد كـ 22 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 22).
           </p>
           {summaryMessage && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{summaryMessage}</div>}
           <div className="card overflow-x-auto">

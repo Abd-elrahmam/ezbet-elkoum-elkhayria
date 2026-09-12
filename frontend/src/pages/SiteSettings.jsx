@@ -35,7 +35,7 @@ const SiteSettings = () => {
     try {
       await api.put("/settings", form);
       reload();
-      setMessage("تم حفظ الإعدادات بنجاح ✅");
+      setMessage("تم حفظ الإعدادات بنجاح ");
     } catch (err) {
       setError(err.response?.data?.message || "حدث خطأ");
     } finally {
@@ -53,7 +53,7 @@ const SiteSettings = () => {
       fd.append(field, file);
       await api.put(endpoint, fd, { headers: { "Content-Type": "multipart/form-data" } });
       reload();
-      setMessage("تم رفع الصورة بنجاح ✅");
+      setMessage("تم رفع الصورة بنجاح ");
     } catch (err) {
       setError(err.response?.data?.message || "فشل رفع الصورة");
     } finally {

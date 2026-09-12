@@ -21,7 +21,7 @@ const Dashboard = () => {
     <div>
       <div className="mb-6">
         <p className="text-primary-600 text-sm font-semibold mb-1">{todayArabic()}</p>
-        <h1 className="text-2xl font-bold text-sand-900">أهلاً، {user?.name} 👋</h1>
+        <h1 className="text-2xl font-bold text-sand-900">أهلاً، {user?.name} </h1>
         <p className="text-sand-500">نظرة سريعة على النظام</p>
       </div>
 
@@ -48,12 +48,12 @@ const Dashboard = () => {
         </div>
       )}
 
-      <div className="card">
+      {/* <div className="card">
         <h2 className="font-bold text-sand-800 mb-2">تنقّل سريع</h2>
         <p className="text-sand-500 text-sm">
           استخدم القائمة الجانبية للوصول إلى الطلاب، الحضور والغياب، الاختبارات، تقييم الطلاب، طلبات الإجازة، والرواتب.
         </p>
-      </div>
+      </div> */}
     </div>
   );
 };

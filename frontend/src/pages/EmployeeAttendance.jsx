@@ -80,7 +80,7 @@ const EmployeeAttendance = () => {
         };
       });
       await api.post("/employee-monthly-attendance/bulk", { records: payload });
-      setMessage("تم حفظ حضور الموظفين بنجاح ✅");
+      setMessage("تم حفظ حضور الموظفين بنجاح ");
     } catch (err) {
       setMessage(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
     } finally {

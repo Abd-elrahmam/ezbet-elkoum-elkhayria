@@ -167,7 +167,7 @@ const Employees = () => {
         teacherId: groupTeacher._id,
         studentIds: Array.from(groupSelected),
       });
-      setGroupMsg("تم تحديث مجموعة الطلاب بنجاح ✅");
+      setGroupMsg("تم تحديث مجموعة الطلاب بنجاح ");
     } catch (err) {
       setGroupMsg(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
     } finally {

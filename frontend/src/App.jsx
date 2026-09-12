@@ -3,7 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
-
+import { PropagateLoader } from "react-spinners";
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -30,10 +30,14 @@ const withLayout = (Component) => (
 );
 
 function App() {
-  const { loading } = useAuth();
+   const { loading } = useAuth();
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-sand-500">جارِ التحميل...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <PropagateLoader color="#000" size={15} />
+      </div>
+    );
   }
 
   return (

@@ -176,9 +176,21 @@ const Memorization = () => {
       setRecords(map);
     });
   };
+  const [attendanceWarning, setAttendanceWarning] = useState("");
+
   useEffect(loadHifz, [department, monthStr, filterBranch]);
+  useEffect(() => setAttendanceWarning(""), [department, monthStr, filterBranch]);
 
   const openStudent = (student) => {
+    const presentDays = attendanceMap[student._id];
+    // مينفعش يسجل حفظ لطالب مش متاخدله غياب الشهر ده، لأن المتوقع (المعدل × أيام الحضور) هيبقى غلط
+    if (presentDays == null) {
+      setAttendanceWarning(
+        `⚠️ لازم تسجّل حضور "${student.name}" في شهر ${MONTH_NAMES[month - 1]} ${year} الأول من صفحة "الحضور والغياب"، وبعدين ترجع تسجّل حفظه.`
+      );
+      return;
+    }
+    setAttendanceWarning("");
     setActiveStudent(student);
     setDraft(records[student._id] || emptyDraft());
     setSaveMsg("");
@@ -288,7 +300,7 @@ const Memorization = () => {
       ];
       await api.post("/hifz/bulk", { records: payload });
       setRecords((prev) => ({ ...prev, [activeStudent._id]: draft }));
-      setSaveMsg("تم الحفظ بنجاح ✅");
+      setSaveMsg("تم الحفظ بنجاح ");
       setTimeout(() => setActiveStudent(null), 700);
     } catch (err) {
       setSaveMsg(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
@@ -365,23 +377,34 @@ const Memorization = () => {
         دوس على اسم الطالب لفتح فورم الحفظ الخاص بيه. أيام الحضور مسحوبة تلقائيًا من الملخص الشهري للحضور. حساب عدد الصفحات من نطاق السورة/الآية تقريبي (والصفحات اللي أكتر من 20 بتتحول لعرض بالأجزاء).
       </p>
 
+      {attendanceWarning && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-xl px-3 py-2 mb-3">
+          {attendanceWarning}
+        </div>
+      )}
+
       <div className="card divide-y divide-sand-100 max-h-[65vh] overflow-y-auto p-0">
         {filteredStudents.map((s) => {
           const rec = records[s._id];
           const presentDays = attendanceMap[s._id];
+          const noAttendance = presentDays == null;
           return (
             <button
               key={s._id}
               type="button"
               onClick={() => openStudent(s)}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-right hover:bg-sand-50 transition"
+              className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-right transition ${noAttendance ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-sand-50"}`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="font-semibold text-sand-900 truncate">{s.name}</span>
                 {statusBadge(rec)}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-xs text-sand-400">حضور: {presentDays != null ? presentDays : "—"}</span>
+                {noAttendance ? (
+                  <span className="text-xs text-amber-600 font-semibold">⚠️ لم يُسجَّل الحضور</span>
+                ) : (
+                  <span className="text-xs text-sand-400">حضور: {presentDays}</span>
+                )}
                 <span className="text-sand-300">›</span>
               </div>
             </button>
