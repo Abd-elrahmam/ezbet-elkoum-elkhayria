@@ -5,23 +5,42 @@ import { useSettings, resolveMediaUrl } from "../context/SettingsContext";
 import Footer from "./Footer";
 import PeriodPicker from "./PeriodPicker";
 
+import {
+  TbLayoutDashboard,
+  TbBuildingSkyscraper,
+  TbSchool,
+  TbUsers,
+  TbClipboardList,
+  TbCalendarStats,
+  TbBook,
+  TbPencil,
+  TbStar,
+  TbTrophy,
+  TbCalendarEvent,
+  TbCash,
+  TbReceipt,
+  TbCoin,
+  TbChartBar,
+  TbSettings,
+} from "react-icons/tb";
+
 const NAV_ITEMS = [
-  { to: "/dashboard", label: "لوحة التحكم", icon: "🏠", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/branches", label: "الفروع", icon: "🏢", roles: ["super_admin"] },
-  { to: "/students", label: "الطلاب", icon: "🎓", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/employees", label: "الموظفون", icon: "👥", roles: ["super_admin", "branch_manager"] },
-  { to: "/attendance", label: "الحضور والغياب", icon: "📋", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/employee-attendance", label: "حضور الموظفين", icon: "🗓️", roles: ["super_admin", "branch_manager"] },
-  { to: "/memorization", label: "تسجيل الحفظ الشهري", icon: "📖", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/tests", label: "الاختبارات", icon: "📝", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/evaluations", label: "تقييم الطلاب", icon: "⭐", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/competitions", label: "مسابقات الموظفين", icon: "🏆", roles: ["super_admin", "branch_manager"] },
-  { to: "/leaves", label: "طلبات الإجازة", icon: "🗓️", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/payments", label: "المدفوعات", icon: "💵", roles: ["super_admin", "branch_manager"] },
-  { to: "/expenses", label: "المصروفات", icon: "🧾", roles: ["super_admin", "branch_manager"] },
-  { to: "/salaries", label: "الرواتب", icon: "💰", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/reports", label: "التقارير", icon: "📊", roles: ["super_admin", "branch_manager", "employee"] },
-  { to: "/settings", label: "إعدادات الموقع", icon: "⚙️", roles: ["super_admin"] },
+  { to: "/dashboard", label: "لوحة التحكم", Icon: TbLayoutDashboard, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/branches", label: "الفروع", Icon: TbBuildingSkyscraper, roles: ["super_admin"] },
+  { to: "/students", label: "الطلاب", Icon: TbSchool, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/employees", label: "الموظفون", Icon: TbUsers, roles: ["super_admin", "branch_manager"] },
+  { to: "/attendance", label: "الحضور والغياب", Icon: TbClipboardList, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/employee-attendance", label: "حضور الموظفين", Icon: TbCalendarStats, roles: ["super_admin", "branch_manager"] },
+  { to: "/memorization", label: "تسجيل الحفظ الشهري", Icon: TbBook, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/tests", label: "الاختبارات", Icon: TbPencil, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/evaluations", label: "تقييم الطلاب", Icon: TbStar, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/competitions", label: "مسابقات الموظفين", Icon: TbTrophy, roles: ["super_admin", "branch_manager"] },
+  { to: "/leaves", label: "طلبات الإجازة", Icon: TbCalendarEvent, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/payments", label: "المدفوعات", Icon: TbCash, roles: ["super_admin", "branch_manager"] },
+  { to: "/expenses", label: "المصروفات", Icon: TbReceipt, roles: ["super_admin", "branch_manager"] },
+  { to: "/salaries", label: "الرواتب", Icon: TbCoin, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/reports", label: "التقارير", Icon: TbChartBar, roles: ["super_admin", "branch_manager", "employee"] },
+  { to: "/settings", label: "إعدادات الموقع", Icon: TbSettings, roles: ["super_admin"] },
 ];
 
 const Layout = ({ children }) => {
@@ -59,24 +78,31 @@ const Layout = ({ children }) => {
 
         {/* قائمة الروابط - المنطقة الوحيدة القابلة للسكرول في السايدبار */}
         <nav className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1">
-          {visibleItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/dashboard"}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
-                  isActive
-                    ? "bg-primary-600 text-white shadow-sm"
-                    : "text-sand-600 hover:bg-sand-50"
-                }`
-              }
-            >
-              <span className="text-lg">{item.icon}</span>
-              {item.label}
-            </NavLink>
-          ))}
+          {visibleItems.map((item) => {
+            const { Icon } = item;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/dashboard"}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+                    isActive
+                      ? "bg-primary-600 text-white shadow-sm"
+                      : "text-sand-600 hover:bg-sand-50"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon className={`text-xl flex-shrink-0 ${isActive ? "text-white" : "text-primary-600"}`} />
+                    <span className="truncate">{item.label}</span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
         </nav>
 
         {/* بيانات المستخدم ثابتة أسفل السايدبار */}
