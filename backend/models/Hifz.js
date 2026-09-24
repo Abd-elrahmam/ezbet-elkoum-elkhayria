@@ -20,16 +20,32 @@ const hifzSchema = new mongoose.Schema(
     // معدل الحفظ اليومي (صفحة) وأيام الحضور، لحساب "المتوقع" مقابل "المحفوظ فعليًا"
     dailyRatePages: { type: Number, min: 0, default: null },
     presentDays: { type: Number, min: 0, default: null },
+    // ملاحظة: expectedPages و totalMemPages هما الإجمالي (فترة 1 + فترة 2 لو مفعّلة)
     expectedPages: { type: Number, min: 0, default: null },
 
-    // الحفظ الجديد
+    // الحفظ الجديد - الفترة الأولى (مثلاً: الصباحية)
+    period1Label: { type: String, trim: true, default: "" },
     memFromSurah: { type: String, trim: true, default: "" },
     memFromAyah: { type: Number, default: null },
     memToSurah: { type: String, trim: true, default: "" },
     memToAyah: { type: Number, default: null },
+    memPages1: { type: Number, min: 0, default: 0 },
+
+    // الحفظ الجديد - الفترة الثانية (اختيارية، مثلاً: المسائية) - نفس فكرة الفترة الأولى بمسمى تاني
+    hasPeriod2: { type: Boolean, default: false },
+    period2Label: { type: String, trim: true, default: "" },
+    dailyRatePages2: { type: Number, min: 0, default: null },
+    expectedPages2: { type: Number, min: 0, default: null },
+    memFromSurah2: { type: String, trim: true, default: "" },
+    memFromAyah2: { type: Number, default: null },
+    memToSurah2: { type: String, trim: true, default: "" },
+    memToAyah2: { type: Number, default: null },
+    memPages2: { type: Number, min: 0, default: 0 },
+
     totalMemPages: { type: Number, min: 0, default: 0 },
 
-    // المراجعة (بالسور - من سورة لسورة، مش بالآية)
+    // المراجعة (بالسور - من سورة لسورة، مش بالآية) - الفترة الأولى
+    revPeriod1Label: { type: String, trim: true, default: "" },
     revFromSurah: { type: String, trim: true, default: "" },
     revFromAyah: { type: Number, default: null },
     revToSurah: { type: String, trim: true, default: "" },
@@ -37,7 +53,19 @@ const hifzSchema = new mongoose.Schema(
     // معدل المراجعة اليومي (صفحة) - زي معدل الحفظ اليومي بالظبط، بيتحسب بيه
     // المتوقع مراجعته = revDailyRatePages × أيام الحضور
     revDailyRatePages: { type: Number, min: 0, default: null },
+    // ملاحظة: expectedRevisionPages و totalRevisionPages هما الإجمالي (فترة 1 + فترة 2 لو مفعّلة)
     expectedRevisionPages: { type: Number, min: 0, default: null },
+    revPages1: { type: Number, min: 0, default: 0 },
+
+    // المراجعة - الفترة الثانية (اختيارية)
+    hasRevPeriod2: { type: Boolean, default: false },
+    revPeriod2Label: { type: String, trim: true, default: "" },
+    revDailyRatePages2: { type: Number, min: 0, default: null },
+    expectedRevisionPages2: { type: Number, min: 0, default: null },
+    revFromSurah2: { type: String, trim: true, default: "" },
+    revToSurah2: { type: String, trim: true, default: "" },
+    revPages2: { type: Number, min: 0, default: 0 },
+
     totalRevisionPages: { type: Number, min: 0, default: 0 },
     revGrade: { type: String, enum: [...GRADES, null], default: null }, // تقييم المراجعة (منفصل عن تقييم الحفظ)
 

@@ -35,8 +35,12 @@ const Dashboard = () => {
   return (
     <div>
       <div className="mb-6">
-        <p className="text-primary-600 text-sm font-semibold mb-1">{todayArabic()}</p>
-        <h1 className="text-2xl font-bold text-sand-900">أهلاً، {user?.name} 👋</h1>
+        <p className="text-primary-600 text-sm font-semibold mb-1">
+          {todayArabic()}
+        </p>
+        <h1 className="text-2xl font-bold text-sand-900">
+          أهلاً، {user?.name}{" "}
+        </h1>
         <p className="text-sand-500">نظرة سريعة على النظام</p>
       </div>
 
@@ -47,8 +51,8 @@ const Dashboard = () => {
               user?.department === "nursery"
                 ? "عدد طلاب حضانتي"
                 : user?.department === "quran"
-                ? "عدد طلاب حلقتي"
-                : "عدد طلابي"
+                  ? "عدد طلاب حلقتي"
+                  : "عدد طلابي"
             }
             value={fmt(stats?.myStudentsCount)}
             icon={<TbSchool className="text-2xl" />}

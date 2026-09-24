@@ -20,7 +20,10 @@ const run = async () => {
     });
     console.log(" تم إنشاء الأدمن الرئيسي:");
     console.log("   اسم المستخدم:", admin.username);
-    console.log("   كلمة المرور:", process.env.SUPER_ADMIN_PASSWORD || "Admin@12345");
+    console.log(
+      "   كلمة المرور:",
+      process.env.SUPER_ADMIN_PASSWORD || "Admin@12345",
+    );
   }
 
   const branchesCount = await Branch.countDocuments();
@@ -37,17 +40,21 @@ const run = async () => {
       "فرع 9",
       "فرع 10",
     ];
-    await Branch.insertMany(branchNames.map((name) => ({ name, hasNursery: true, hasQuran: true })));
-    console.log(` تم إنشاء ${branchNames.length} فروع تجريبية (عدّل أسماءها من النظام)`);
+    await Branch.insertMany(
+      branchNames.map((name) => ({ name, hasNursery: true, hasQuran: true })),
+    );
+    console.log(
+      ` تم إنشاء ${branchNames.length} فروع تجريبية (عدّل أسماءها من النظام)`,
+    );
   } else {
     console.log("⚠️  توجد فروع بالفعل، تم تخطي إنشاء فروع تجريبية");
   }
 
-  console.log(" تمت التهيئة بنجاح");
+  console.log("🎉 تمت التهيئة بنجاح");
   process.exit(0);
 };
 
 run().catch((err) => {
-  console.error(" فشل التهيئة:", err);
+  console.error("❌ فشل التهيئة:", err);
   process.exit(1);
 });

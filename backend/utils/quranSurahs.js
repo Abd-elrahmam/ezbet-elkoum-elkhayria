@@ -124,3 +124,6 @@ const SURAHS = [
 ];
 
 module.exports = { SURAHS, QURAN_TOTAL_PAGES };
+
+
+

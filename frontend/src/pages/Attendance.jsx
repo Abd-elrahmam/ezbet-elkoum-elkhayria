@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { usePeriod, MONTH_NAMES } from "../context/PeriodContext";
 import { useDepartmentAccess } from "../hooks/useDepartmentAccess";
 
-const MONTH_TOTAL_DAYS = 20;
+const MONTH_TOTAL_DAYS = 22;
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -127,7 +127,7 @@ const Attendance = () => {
     }
   };
 
-  // تعديل الحضور أو الغياب بيحسب التاني تلقائي (المجموع = 22 يوم)
+  // تعديل الحضور أو الغياب بيحسب التاني تلقائي (المجموع = 20 يوم)
   const setSummaryField = (studentId, field, value) => {
     let num = value === "" ? "" : Math.max(0, Math.min(MONTH_TOTAL_DAYS, Number(value)));
     setSummary((prev) => {

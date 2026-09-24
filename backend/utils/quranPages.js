@@ -1,4 +1,27 @@
 const { SURAHS, QURAN_TOTAL_PAGES } = require("./quranSurahs");
+const ayahs = require("../data/quran-ayahs.json");
+
+// خريطة سريعة: "surahId:ayahNumber" → page
+// بنستخدم Map عشان البحث يكون O(1) بدل O(n)
+const pageMap = new Map();
+ayahs.forEach((a) => {
+  pageMap.set(`${a.surah_id}:${a.number_in_surah}`, a.page);
+});
+
+/**
+ * إرجاع رقم الصفحة الحقيقي لآية معينة
+ * البيانات من ملف quran-ayahs.json (دقة 100%)
+ *
+ * @param {number} surahNumber - رقم السورة (1-114)
+ * @param {number} ayahNumber - رقم الآية داخل السورة
+ * @returns {number|null}
+ */
+function pageForAyah(surahNumber, ayahNumber) {
+  const s = Number(surahNumber);
+  const a = Number(ayahNumber);
+  if (!s || !a || s < 1 || s > 114 || a < 1) return null;
+  return pageMap.get(`${s}:${a}`) || null;
+}
 
 function findSurahByName(name) {
   if (!name) return null;
@@ -11,37 +34,35 @@ function surahNameByNumber(number) {
   return s ? s.name : "";
 }
 
-// إرجاع رقم الصفحة التقريبي لآية معينة (بالتناسب الخطي داخل نطاق صفحات السورة)
-function pageForAyah(surahNumber, ayahNumber) {
-  const surah = SURAHS.find((s) => s.number === Number(surahNumber));
-  if (!surah) return null;
-  const next = SURAHS.find((s) => s.number === surah.number + 1);
-  const startPage = surah.startPage;
-  const endPageExclusive = next ? next.startPage : QURAN_TOTAL_PAGES + 1;
-  const pageSpan = Math.max(endPageExclusive - startPage, 1);
-  const ayah = Math.min(Math.max(Number(ayahNumber) || 1, 1), surah.ayahCount);
-  const ratio = (ayah - 1) / surah.ayahCount;
-  let page = startPage + Math.floor(ratio * pageSpan);
-  if (page >= endPageExclusive) page = endPageExclusive - 1;
-  if (page < startPage) page = startPage;
-  return page;
-}
-
 // حساب عدد الصفحات بين نقطتين (من سورة/آية - إلى سورة/آية)
 function computePagesRange(fromSurah, fromAyah, toSurah, toAyah) {
   const fromPage = pageForAyah(fromSurah, fromAyah);
   const toPage = pageForAyah(toSurah, toAyah);
-  if (fromPage == null || toPage == null) return { fromPage: null, toPage: null, pagesCount: 0 };
-  const pagesCount = Math.max(toPage - fromPage + 1, toPage >= fromPage ? 1 : 0);
-  return { fromPage, toPage, pagesCount };
+  if (fromPage == null || toPage == null)
+    return { fromPage: null, toPage: null, pagesCount: 0 };
+  if (toPage < fromPage) return { fromPage, toPage, pagesCount: 0 };
+  return { fromPage, toPage, pagesCount: toPage - fromPage + 1 };
 }
 
-// نفس computePagesRange لكن باستخدام اسم السورة بدل الرقم
+// نفس الحساب لكن باستخدام اسم السورة بدل الرقم
 function computePagesRangeByName(fromName, fromAyah, toName, toAyah) {
   const fromSurah = findSurahByName(fromName);
   const toSurah = findSurahByName(toName);
-  if (!fromSurah || !toSurah) return { fromPage: null, toPage: null, pagesCount: 0 };
-  return computePagesRange(fromSurah.number, fromAyah, toSurah.number, toAyah);
+  if (!fromSurah || !toSurah)
+    return { fromPage: null, toPage: null, pagesCount: 0 };
+  return computePagesRange(
+    fromSurah.number,
+    fromAyah,
+    toSurah.number,
+    toAyah
+  );
 }
 
-module.exports = { pageForAyah, computePagesRange, computePagesRangeByName, findSurahByName, surahNameByNumber };
+module.exports = {
+  pageForAyah,
+  computePagesRange,
+  computePagesRangeByName,
+  findSurahByName,
+  surahNameByNumber,
+  QURAN_TOTAL_PAGES,
+};

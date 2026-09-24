@@ -20,7 +20,10 @@ const GRADE_LABELS = {
 const monthLabel = (monthStr) => {
   if (!monthStr) return "";
   const [y, m] = monthStr.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("ar-EG", { year: "numeric", month: "long" });
+  return new Date(y, m - 1, 1).toLocaleDateString("ar-EG", {
+    year: "numeric",
+    month: "long",
+  });
 };
 
 const getMonthBounds = (monthStr) => {
@@ -41,7 +44,8 @@ const sumAttendance = (records) => {
 
 // يحول أرقام الحضور المجمّعة (لمجموعة أشخاص) لنسب مئوية، عشان الجمع الخام يكون مضلل
 const attendanceRates = (summary) => {
-  const total = summary.present + summary.absent + summary.late + summary.excused;
+  const total =
+    summary.present + summary.absent + summary.late + summary.excused;
   const pct = (n) => (total ? Math.round((n / total) * 100) : 0);
   return {
     presentRate: pct(summary.present),
@@ -53,13 +57,29 @@ const attendanceRates = (summary) => {
 };
 
 const memRange = (r) => {
-  if (!r.memFromSurah && !r.memToSurah) return null;
-  return `من ${r.memFromSurah || "—"}${r.memFromAyah ? ` (آية ${r.memFromAyah})` : ""} إلى ${r.memToSurah || "—"}${r.memToAyah ? ` (آية ${r.memToAyah})` : ""}`;
+  const p1 =
+    !r.memFromSurah && !r.memToSurah
+      ? null
+      : `${r.hasPeriod2 ? `${r.period1Label || "الفترة الأولى"}: ` : ""}من ${r.memFromSurah || "—"}${r.memFromAyah ? ` (آية ${r.memFromAyah})` : ""} إلى ${r.memToSurah || "—"}${r.memToAyah ? ` (آية ${r.memToAyah})` : ""}`;
+  const p2 =
+    r.hasPeriod2 && (r.memFromSurah2 || r.memToSurah2)
+      ? `${r.period2Label || "الفترة الثانية"}: من ${r.memFromSurah2 || "—"}${r.memFromAyah2 ? ` (آية ${r.memFromAyah2})` : ""} إلى ${r.memToSurah2 || "—"}${r.memToAyah2 ? ` (آية ${r.memToAyah2})` : ""}`
+      : null;
+  if (!p1 && !p2) return null;
+  return [p1, p2].filter(Boolean).join(" | ");
 };
 
 const revRange = (r) => {
-  if (!r.revFromSurah && !r.revToSurah) return null;
-  return `من سورة ${r.revFromSurah || "—"} إلى سورة ${r.revToSurah || "—"}`;
+  const p1 =
+    !r.revFromSurah && !r.revToSurah
+      ? null
+      : `${r.hasRevPeriod2 ? `${r.revPeriod1Label || "الفترة الأولى"}: ` : ""}من سورة ${r.revFromSurah || "—"} إلى سورة ${r.revToSurah || "—"}`;
+  const p2 =
+    r.hasRevPeriod2 && (r.revFromSurah2 || r.revToSurah2)
+      ? `${r.revPeriod2Label || "الفترة الثانية"}: من سورة ${r.revFromSurah2 || "—"} إلى سورة ${r.revToSurah2 || "—"}`
+      : null;
+  if (!p1 && !p2) return null;
+  return [p1, p2].filter(Boolean).join(" | ");
 };
 
 const GRADE_LABELS_AR = GRADE_LABELS; // alias للوضوح جوه رسالة الواتساب
@@ -79,32 +99,43 @@ const buildWhatsAppMessage = (report, monthText) => {
   const student = report.person;
   const deptLabel = student?.department === "nursery" ? "الحضانة" : "الكتاب";
   const branchName = student?.branch?.name || "";
-  const guardianName = student?.guardianName ? `سيد/ة ${student.guardianName}` : "ولي الأمر الكريم";
+  const guardianName = student?.guardianName
+    ? `سيد/ة ${student.guardianName}`
+    : "ولي الأمر الكريم";
 
   const lines = [];
   lines.push(`السلام عليكم ${guardianName}`);
   lines.push(`ولي أمر الطالب: ${student?.name || ""}`);
-  lines.push(`هذا تقرير ${monthText} من إدارة ${deptLabel}${branchName ? ` - فرع ${branchName}` : ""}`);
+  lines.push(
+    `هذا تقرير ${monthText} من إدارة ${deptLabel}${branchName ? ` - فرع ${branchName}` : ""}`,
+  );
   lines.push("");
   lines.push("📋 *الحضور والغياب*");
-  lines.push(`حاضر: ${report.attendance.present} يوم | غائب: ${report.attendance.absent} يوم | متأخر: ${report.attendance.late} | معتذر: ${report.attendance.excused}`);
+  lines.push(
+    `حاضر: ${report.attendance.present} يوم | غائب: ${report.attendance.absent} يوم | متأخر: ${report.attendance.late} | معتذر: ${report.attendance.excused}`,
+  );
 
   if (report.hifz) {
     lines.push("");
     lines.push("📖 *الحفظ الشهري*");
     lines.push(
-      `الحفظ الجديد: ${formatPagesOrJuz(report.hifz.totalMemPages)}${report.hifz.expectedPages > 0 ? ` من ${formatPagesOrJuz(report.hifz.expectedPages)}` : ""}`
+      `الحفظ الجديد: ${formatPagesOrJuz(report.hifz.totalMemPages)}${report.hifz.expectedPages > 0 ? ` من ${formatPagesOrJuz(report.hifz.expectedPages)}` : ""}`,
     );
     lines.push(
-      `المراجعة: ${formatPagesOrJuz(report.hifz.totalRevisionPages)}${report.hifz.expectedRevisionPages > 0 ? ` من ${formatPagesOrJuz(report.hifz.expectedRevisionPages)}` : ""}`
+      `المراجعة: ${formatPagesOrJuz(report.hifz.totalRevisionPages)}${report.hifz.expectedRevisionPages > 0 ? ` من ${formatPagesOrJuz(report.hifz.expectedRevisionPages)}` : ""}`,
     );
-    if (report.hifz.grade) lines.push(`تقييم الحفظ: ${GRADE_LABELS_AR[report.hifz.grade]}`);
-    if (report.hifz.revGrade) lines.push(`تقييم المراجعة: ${GRADE_LABELS_AR[report.hifz.revGrade]}`);
+    if (report.hifz.grade)
+      lines.push(`تقييم الحفظ: ${GRADE_LABELS_AR[report.hifz.grade]}`);
+    if (report.hifz.revGrade)
+      lines.push(`تقييم المراجعة: ${GRADE_LABELS_AR[report.hifz.revGrade]}`);
     if (report.hifz.notes) lines.push(`ملاحظات: ${report.hifz.notes}`);
   }
 
   if (report.evaluations?.length) {
-    const avg = (report.evaluations.reduce((s, e) => s + e.rating, 0) / report.evaluations.length).toFixed(1);
+    const avg = (
+      report.evaluations.reduce((s, e) => s + e.rating, 0) /
+      report.evaluations.length
+    ).toFixed(1);
     lines.push("");
     lines.push(`⭐ *متوسط التقييم*: ${avg} / 5`);
   }
@@ -113,7 +144,9 @@ const buildWhatsAppMessage = (report, monthText) => {
     lines.push("");
     lines.push("📝 *الاختبارات*");
     report.tests.forEach((t) => {
-      lines.push(`${t.title || (t.type === "weekly" ? "اختبار أسبوعي" : "اختبار شهري")}: ${t.score}/${t.maxScore}`);
+      lines.push(
+        `${t.title || (t.type === "weekly" ? "اختبار أسبوعي" : "اختبار شهري")}: ${t.score}/${t.maxScore}`,
+      );
     });
   }
 
@@ -128,23 +161,32 @@ const buildAnnualWhatsAppMessage = (report) => {
   const student = report.person;
   const deptLabel = student?.department === "nursery" ? "الحضانة" : "الكتاب";
   const branchName = student?.branch?.name || "";
-  const guardianName = student?.guardianName ? `سيد/ة ${student.guardianName}` : "ولي الأمر الكريم";
+  const guardianName = student?.guardianName
+    ? `سيد/ة ${student.guardianName}`
+    : "ولي الأمر الكريم";
   const months = report.months || [];
 
   const totalPresent = months.reduce((s, d) => s + d.attendance.present, 0);
   const totalAbsent = months.reduce((s, d) => s + d.attendance.absent, 0);
   const totalMem = months.reduce((s, d) => s + (d.hifz?.totalMemPages || 0), 0);
-  const totalRev = months.reduce((s, d) => s + (d.hifz?.totalRevisionPages || 0), 0);
+  const totalRev = months.reduce(
+    (s, d) => s + (d.hifz?.totalRevisionPages || 0),
+    0,
+  );
 
   const lines = [];
   lines.push(`السلام عليكم ${guardianName}`);
   lines.push(`ولي أمر الطالب: ${student?.name || ""}`);
-  lines.push(`هذا التقرير السنوي لسنة ${report.year} من إدارة ${deptLabel}${branchName ? ` - فرع ${branchName}` : ""}`);
+  lines.push(
+    `هذا التقرير السنوي لسنة ${report.year} من إدارة ${deptLabel}${branchName ? ` - فرع ${branchName}` : ""}`,
+  );
   lines.push("");
   lines.push(`📅 عدد الشهور المسجلة: ${months.length}`);
-  lines.push(`📋 إجمالي أيام الحضور: ${totalPresent} | إجمالي أيام الغياب: ${totalAbsent}`);
+  lines.push(
+    `📋 إجمالي أيام الحضور: ${totalPresent} | إجمالي أيام الغياب: ${totalAbsent}`,
+  );
   lines.push(`📖 إجمالي الحفظ الجديد: ${formatPagesOrJuz(totalMem)}`);
-  lines.push(`🔁 إجمالي المراجعة: ${formatPagesOrJuz(totalRev)}`);
+  lines.push(`إجمالي المراجعة: ${formatPagesOrJuz(totalRev)}`);
   lines.push("");
   lines.push("📎 تقرير تفصيلي كامل لكل شهر على حدة مرفق في ملف PDF.");
   lines.push("");
@@ -159,8 +201,12 @@ const currentYearNum = () => new Date().getFullYear();
 // (بتتنادى 12 مرة في التقرير السنوي، ومرة واحدة في التقرير الشهري)
 const fetchStudentMonthReport = async (studentId, monthStr) => {
   const [attendanceRes, evaluationsRes, testsRes, hifzRes] = await Promise.all([
-    api.get("/monthly-attendance", { params: { student: studentId, month: monthStr } }),
-    api.get("/evaluations", { params: { student: studentId, month: monthStr } }),
+    api.get("/monthly-attendance", {
+      params: { student: studentId, month: monthStr },
+    }),
+    api.get("/evaluations", {
+      params: { student: studentId, month: monthStr },
+    }),
     api.get("/tests", { params: { student: studentId, month: monthStr } }),
     api.get("/hifz", { params: { student: studentId, month: monthStr } }),
   ]);
@@ -175,7 +221,9 @@ const fetchStudentMonthReport = async (studentId, monthStr) => {
 
 const fetchEmployeeMonthReport = async (employeeId, monthStr) => {
   const [attendanceRes, salariesRes, leavesRes, hifzRes] = await Promise.all([
-    api.get("/employee-monthly-attendance", { params: { employee: employeeId, month: monthStr } }),
+    api.get("/employee-monthly-attendance", {
+      params: { employee: employeeId, month: monthStr },
+    }),
     api.get("/salaries", { params: { employee: employeeId, month: monthStr } }),
     api.get("/leaves", { params: { employee: employeeId } }),
     api.get("/hifz", { params: { employee: employeeId, month: monthStr } }),
@@ -198,13 +246,26 @@ const fetchEmployeeMonthReport = async (employeeId, monthStr) => {
 const fetchBranchMonthReport = async (branchId, monthStr) => {
   const { start, end } = getMonthBounds(monthStr);
   const [
-    studentsRes, employeesRes, attendanceRes, employeeAttendanceRes,
-    paymentsRes, expensesRes, salariesRes, evaluationsRes, leavesRes, competitionsRes, hifzRes,
+    studentsRes,
+    employeesRes,
+    attendanceRes,
+    employeeAttendanceRes,
+    paymentsRes,
+    expensesRes,
+    salariesRes,
+    evaluationsRes,
+    leavesRes,
+    competitionsRes,
+    hifzRes,
   ] = await Promise.all([
     api.get("/students", { params: { branch: branchId } }),
     api.get("/users", { params: { branch: branchId, role: "employee" } }),
-    api.get("/monthly-attendance", { params: { branch: branchId, month: monthStr } }),
-    api.get("/employee-monthly-attendance", { params: { branch: branchId, month: monthStr } }),
+    api.get("/monthly-attendance", {
+      params: { branch: branchId, month: monthStr },
+    }),
+    api.get("/employee-monthly-attendance", {
+      params: { branch: branchId, month: monthStr },
+    }),
     api.get("/payments", { params: { branch: branchId, month: monthStr } }),
     api.get("/expenses", { params: { branch: branchId, month: monthStr } }),
     api.get("/salaries", { params: { branch: branchId, month: monthStr } }),
@@ -214,7 +275,9 @@ const fetchBranchMonthReport = async (branchId, monthStr) => {
     api.get("/hifz", { params: { branch: branchId, month: monthStr } }),
   ]);
 
-  const studentAttendance = sumAttendance(attendanceRes.data.filter((a) => a.student));
+  const studentAttendance = sumAttendance(
+    attendanceRes.data.filter((a) => a.student),
+  );
   const employeeAttendance = sumAttendance(employeeAttendanceRes.data);
   const totalIncome = paymentsRes.data.reduce((sum, p) => sum + p.amount, 0);
   const totalExpenses = expensesRes.data.reduce((sum, e) => sum + e.amount, 0);
@@ -228,13 +291,17 @@ const fetchBranchMonthReport = async (branchId, monthStr) => {
     return d >= start && d < end;
   });
   const avgRating = evaluationsRes.data.length
-    ? (evaluationsRes.data.reduce((sum, ev) => sum + ev.rating, 0) / evaluationsRes.data.length).toFixed(1)
+    ? (
+        evaluationsRes.data.reduce((sum, ev) => sum + ev.rating, 0) /
+        evaluationsRes.data.length
+      ).toFixed(1)
     : null;
 
   return {
     month: monthStr,
     studentsCount: studentsRes.data.length,
-    nurseryCount: studentsRes.data.filter((s) => s.department === "nursery").length,
+    nurseryCount: studentsRes.data.filter((s) => s.department === "nursery")
+      .length,
     quranCount: studentsRes.data.filter((s) => s.department === "quran").length,
     employeesCount: employeesRes.data.length,
     studentAttendance,
@@ -255,26 +322,44 @@ const fetchBranchMonthReport = async (branchId, monthStr) => {
 // هل الشهر ده فيه أي بيانات مسجلة فعلًا؟ (عشان التقرير السنوي يعرض بس الشهور "المسجلة")
 const studentMonthHasData = (d) => {
   const a = d.attendance;
-  return a.present + a.absent + a.late + a.excused > 0 || d.evaluations.length > 0 || d.tests.length > 0 || !!d.hifz;
+  return (
+    a.present + a.absent + a.late + a.excused > 0 ||
+    d.evaluations.length > 0 ||
+    d.tests.length > 0 ||
+    !!d.hifz
+  );
 };
 const employeeMonthHasData = (d) => {
   const a = d.attendance;
-  return a.present + a.absent + a.late + a.excused > 0 || !!d.salary || d.leaves.length > 0 || !!d.hifz;
+  return (
+    a.present + a.absent + a.late + a.excused > 0 ||
+    !!d.salary ||
+    d.leaves.length > 0 ||
+    !!d.hifz
+  );
 };
 const branchMonthHasData = (d) => {
-  const sa = d.studentAttendance, ea = d.employeeAttendance;
+  const sa = d.studentAttendance,
+    ea = d.employeeAttendance;
   return (
     sa.present + sa.absent + sa.late + sa.excused > 0 ||
     ea.present + ea.absent + ea.late + ea.excused > 0 ||
-    d.totalIncome > 0 || d.totalExpenses > 0 || d.evaluationsCount > 0 || d.hifzCount > 0 ||
-    d.salaries.length > 0 || d.leaves.length > 0 || d.competitions.length > 0
+    d.totalIncome > 0 ||
+    d.totalExpenses > 0 ||
+    d.evaluationsCount > 0 ||
+    d.hifzCount > 0 ||
+    d.salaries.length > 0 ||
+    d.leaves.length > 0 ||
+    d.competitions.length > 0
   );
 };
 
 const Reports = () => {
   const { user } = useAuth();
   const { settings } = useSettings();
-  const logoSrc = settings?.logoUrl ? resolveMediaUrl(settings.logoUrl) : "/logo.jpg";
+  const logoSrc = settings?.logoUrl
+    ? resolveMediaUrl(settings.logoUrl)
+    : "/logo.jpg";
 
   const [reportType, setReportType] = useState("student");
   const [reportMode, setReportMode] = useState("monthly"); // monthly | annual
@@ -293,31 +378,43 @@ const Reports = () => {
   const [sendingPdf, setSendingPdf] = useState(false);
 
   useEffect(() => {
-    if (user.role === "employee" && reportType !== "student") setReportType("student");
+    if (user.role === "employee" && reportType !== "student")
+      setReportType("student");
   }, [user.role, reportType]);
 
   useEffect(() => {
-    if (user.role === "super_admin") api.get("/branches").then((res) => setBranches(res.data));
+    if (user.role === "super_admin")
+      api.get("/branches").then((res) => setBranches(res.data));
   }, []);
 
   useEffect(() => {
     setSelectedPerson("");
     setReport(null);
-    const branchId = user.role === "super_admin" ? selectedBranch : user.branch?._id || user.branch;
+    const branchId =
+      user.role === "super_admin"
+        ? selectedBranch
+        : user.branch?._id || user.branch;
     if (!branchId || reportType === "branch") {
       setStudents([]);
       setEmployees([]);
       return;
     }
     if (reportType === "student") {
-      api.get("/students", { params: { branch: branchId } }).then((res) => setStudents(res.data));
+      api
+        .get("/students", { params: { branch: branchId } })
+        .then((res) => setStudents(res.data));
     } else {
-      api.get("/users", { params: { branch: branchId, role: "employee" } }).then((res) => setEmployees(res.data));
+      api
+        .get("/users", { params: { branch: branchId, role: "employee" } })
+        .then((res) => setEmployees(res.data));
     }
   }, [reportType, selectedBranch]);
 
   const generateReport = async () => {
-    const branchId = user.role === "super_admin" ? selectedBranch : user.branch?._id || user.branch;
+    const branchId =
+      user.role === "super_admin"
+        ? selectedBranch
+        : user.branch?._id || user.branch;
     if (reportType !== "branch" && !selectedPerson) return;
     if (reportType === "branch" && !branchId) return;
     if (reportMode === "monthly" && !month) return;
@@ -329,21 +426,53 @@ const Reports = () => {
     try {
       if (reportMode === "annual") {
         // مانجيبش شهور مستقبلية لسه معملهاش
-        const relevantMonths = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`)
-          .filter((m) => m <= currentMonth());
+        const relevantMonths = Array.from(
+          { length: 12 },
+          (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`,
+        ).filter((m) => m <= currentMonth());
 
         if (reportType === "student") {
           const student = students.find((s) => s._id === selectedPerson);
-          const results = await Promise.all(relevantMonths.map((m) => fetchStudentMonthReport(selectedPerson, m)));
-          setReport({ mode: "annual", type: "student", person: student, year, months: results.filter(studentMonthHasData) });
+          const results = await Promise.all(
+            relevantMonths.map((m) =>
+              fetchStudentMonthReport(selectedPerson, m),
+            ),
+          );
+          setReport({
+            mode: "annual",
+            type: "student",
+            person: student,
+            year,
+            months: results.filter(studentMonthHasData),
+          });
         } else if (reportType === "employee") {
           const employee = employees.find((e) => e._id === selectedPerson);
-          const results = await Promise.all(relevantMonths.map((m) => fetchEmployeeMonthReport(selectedPerson, m)));
-          setReport({ mode: "annual", type: "employee", person: employee, year, months: results.filter(employeeMonthHasData) });
+          const results = await Promise.all(
+            relevantMonths.map((m) =>
+              fetchEmployeeMonthReport(selectedPerson, m),
+            ),
+          );
+          setReport({
+            mode: "annual",
+            type: "employee",
+            person: employee,
+            year,
+            months: results.filter(employeeMonthHasData),
+          });
         } else {
-          const branch = branches.find((b) => b._id === branchId) || { name: user.branch?.name };
-          const results = await Promise.all(relevantMonths.map((m) => fetchBranchMonthReport(branchId, m)));
-          setReport({ mode: "annual", type: "branch", branch, year, months: results.filter(branchMonthHasData) });
+          const branch = branches.find((b) => b._id === branchId) || {
+            name: user.branch?.name,
+          };
+          const results = await Promise.all(
+            relevantMonths.map((m) => fetchBranchMonthReport(branchId, m)),
+          );
+          setReport({
+            mode: "annual",
+            type: "branch",
+            branch,
+            year,
+            months: results.filter(branchMonthHasData),
+          });
         }
         return;
       }
@@ -352,13 +481,25 @@ const Reports = () => {
       if (reportType === "student") {
         const student = students.find((s) => s._id === selectedPerson);
         const data = await fetchStudentMonthReport(selectedPerson, month);
-        setReport({ mode: "monthly", type: "student", person: student, ...data });
+        setReport({
+          mode: "monthly",
+          type: "student",
+          person: student,
+          ...data,
+        });
       } else if (reportType === "employee") {
         const employee = employees.find((e) => e._id === selectedPerson);
         const data = await fetchEmployeeMonthReport(selectedPerson, month);
-        setReport({ mode: "monthly", type: "employee", person: employee, ...data });
+        setReport({
+          mode: "monthly",
+          type: "employee",
+          person: employee,
+          ...data,
+        });
       } else {
-        const branch = branches.find((b) => b._id === branchId) || { name: user.branch?.name };
+        const branch = branches.find((b) => b._id === branchId) || {
+          name: user.branch?.name,
+        };
         const data = await fetchBranchMonthReport(branchId, month);
         setReport({ mode: "monthly", type: "branch", branch, ...data });
       }
@@ -377,7 +518,10 @@ const Reports = () => {
     if (!reportRef.current || !report?.person?.guardianPhone) return;
     setSendingPdf(true);
     try {
-      const canvas = await html2canvas(reportRef.current, { scale: 2, backgroundColor: "#ffffff" });
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+      });
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -408,21 +552,35 @@ const Reports = () => {
     }
   };
 
-  const reportTitle = { student: "للطالب", employee: "للموظف", branch: "للفرع" }[reportType];
+  const reportTitle = {
+    student: "للطالب",
+    employee: "للموظف",
+    branch: "للفرع",
+  }[reportType];
 
   return (
     <div>
       <div className="print:hidden">
-        <h1 className="text-2xl font-bold text-sand-900 mb-6">التقارير الشهرية</h1>
+        <h1 className="text-2xl font-bold text-sand-900 mb-6">
+          التقارير الشهرية
+        </h1>
 
         <div className="card space-y-4 mb-6">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">نوع التقرير</label>
-              <select className="input" value={reportType} onChange={(e) => setReportType(e.target.value)}>
+              <select
+                className="input"
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+              >
                 <option value="student">تقرير طالب</option>
-                {user.role !== "employee" && <option value="employee">تقرير موظف</option>}
-                {user.role !== "employee" && <option value="branch">تقرير فرع شامل</option>}
+                {user.role !== "employee" && (
+                  <option value="employee">تقرير موظف</option>
+                )}
+                {user.role !== "employee" && (
+                  <option value="branch">تقرير فرع شامل</option>
+                )}
               </select>
             </div>
             <div>
@@ -444,11 +602,25 @@ const Reports = () => {
                 </button>
               </div>
               {reportMode === "monthly" ? (
-                <input className="input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+                <input
+                  className="input"
+                  type="month"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                />
               ) : (
                 <>
-                  <input className="input" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} placeholder="السنة" />
-                  <p className="text-xs text-sand-400 mt-1">هيتم عرض كل الشهور اللي فيها بيانات مسجلة في السنة دي تفصيليًا</p>
+                  <input
+                    className="input"
+                    type="number"
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    placeholder="السنة"
+                  />
+                  <p className="text-xs text-sand-400 mt-1">
+                    هيتم عرض كل الشهور اللي فيها بيانات مسجلة في السنة دي
+                    تفصيليًا
+                  </p>
                 </>
               )}
             </div>
@@ -458,32 +630,58 @@ const Reports = () => {
             {user.role === "super_admin" && (
               <div>
                 <label className="label">الفرع</label>
-                <select className="input" value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}>
+                <select
+                  className="input"
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                >
                   <option value="">اختر الفرع</option>
                   {branches.map((b) => (
-                    <option key={b._id} value={b._id}>{b.name}</option>
+                    <option key={b._id} value={b._id}>
+                      {b.name}
+                    </option>
                   ))}
                 </select>
               </div>
             )}
             {reportType !== "branch" && (
               <div>
-                <label className="label">{reportType === "student" ? "الطالب" : "الموظف"}</label>
-                <select className="input" value={selectedPerson} onChange={(e) => setSelectedPerson(e.target.value)}>
-                  <option value="">{reportType === "student" ? "اختر الطالب" : "اختر الموظف"}</option>
-                  {(reportType === "student" ? students : employees).map((p) => (
-                    <option key={p._id} value={p._id}>{p.name}</option>
-                  ))}
+                <label className="label">
+                  {reportType === "student" ? "الطالب" : "الموظف"}
+                </label>
+                <select
+                  className="input"
+                  value={selectedPerson}
+                  onChange={(e) => setSelectedPerson(e.target.value)}
+                >
+                  <option value="">
+                    {reportType === "student" ? "اختر الطالب" : "اختر الموظف"}
+                  </option>
+                  {(reportType === "student" ? students : employees).map(
+                    (p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.name}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
             )}
           </div>
 
-          {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
+          {error && (
+            <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">
+              {error}
+            </div>
+          )}
 
           <button
             className="btn-primary"
-            disabled={(reportType !== "branch" && !selectedPerson) || loading || (reportMode === "monthly" ? !month : !year)}
+            disabled={
+              (reportType !== "branch" && !selectedPerson) ||
+              loading ||
+              (reportMode === "monthly" ? !month : !year)
+            }
             onClick={generateReport}
           >
             {loading ? "جارِ التجهيز..." : "إنشاء التقرير"}
@@ -494,8 +692,9 @@ const Reports = () => {
       {report && (
         <div className="print:block">
           <div className="flex justify-end gap-2 mb-4 print:hidden">
-            {report.mode !== "annual" && report.type === "student" && (
-              report.person?.guardianPhone ? (
+            {report.mode !== "annual" &&
+              report.type === "student" &&
+              (report.person?.guardianPhone ? (
                 <a
                   className="btn-secondary"
                   href={`https://wa.me/${toWhatsAppNumber(report.person.guardianPhone)}?text=${encodeURIComponent(buildWhatsAppMessage(report, `شهر ${monthLabel(month)}`))}`}
@@ -505,315 +704,588 @@ const Reports = () => {
                   📱 إرسال لولي الأمر واتساب
                 </a>
               ) : (
-                <span className="text-xs text-sand-400 self-center">لا يوجد رقم واتساب مسجل لولي الأمر</span>
-              )
-            )}
-            {report.mode === "annual" && report.type === "student" && (
-              report.person?.guardianPhone ? (
-                <button className="btn-secondary" onClick={handleSendAnnualPdf} disabled={sendingPdf}>
-                  {sendingPdf ? "جارِ التجهيز..." : "📱 إرسال لولي الأمر (PDF + رسالة)"}
+                <span className="text-xs text-sand-400 self-center">
+                  لا يوجد رقم واتساب مسجل لولي الأمر
+                </span>
+              ))}
+            {report.mode === "annual" &&
+              report.type === "student" &&
+              (report.person?.guardianPhone ? (
+                <button
+                  className="btn-secondary"
+                  onClick={handleSendAnnualPdf}
+                  disabled={sendingPdf}
+                >
+                  {sendingPdf
+                    ? "جارِ التجهيز..."
+                    : "📱 إرسال لولي الأمر (PDF + رسالة)"}
                 </button>
               ) : (
-                <span className="text-xs text-sand-400 self-center">لا يوجد رقم واتساب مسجل لولي الأمر</span>
-              )
-            )}
-            <button className="btn-primary" onClick={() => window.print()}>🖨️ طباعة التقرير</button>
+                <span className="text-xs text-sand-400 self-center">
+                  لا يوجد رقم واتساب مسجل لولي الأمر
+                </span>
+              ))}
+            <button className="btn-primary" onClick={() => window.print()}>
+              🖨️ طباعة التقرير
+            </button>
           </div>
-          {report.mode === "annual" && report.type === "student" && report.person?.guardianPhone && (
-            <p className="text-xs text-sand-400 -mt-3 mb-4 print:hidden">
-              هيتنزّل ملف PDF على جهازك تلقائيًا، وهيتفتح واتساب برسالة جاهزة لولي الأمر — كل اللي عليك إنك ترفق ملف الـ PDF اللي نزل يدويًا جوه المحادثة قبل الإرسال (واتساب مفيش فيه رابط بيرفق ملفات أوتوماتيك).
-            </p>
-          )}
+          {report.mode === "annual" &&
+            report.type === "student" &&
+            report.person?.guardianPhone && (
+              <p className="text-xs text-sand-400 -mt-3 mb-4 print:hidden">
+                هيتنزّل ملف PDF على جهازك تلقائيًا، وهيتفتح واتساب برسالة جاهزة
+                لولي الأمر — كل اللي عليك إنك ترفق ملف الـ PDF اللي نزل يدويًا
+                جوه المحادثة قبل الإرسال (واتساب مفيش فيه رابط بيرفق ملفات
+                أوتوماتيك).
+              </p>
+            )}
 
-          <div ref={reportRef} className="card print:shadow-none print:border-none print:p-0">
+          <div
+            ref={reportRef}
+            className="card print:shadow-none print:border-none print:p-0"
+          >
             <div className="flex items-center gap-4 border-b-2 border-primary-600 pb-4 mb-6">
-              <img src={logoSrc} alt="الشعار" className="w-16 h-16 rounded-full object-cover border border-sand-200" />
+              <img
+                src={logoSrc}
+                alt="الشعار"
+                className="w-16 h-16 rounded-full object-cover border border-sand-200"
+              />
               <div>
-                <h2 className="text-xl font-bold text-sand-900">{settings?.heroTitle || "جمعية العلوم الخيرية بعزبة الكوم"}</h2>
+                <h2 className="text-xl font-bold text-sand-900">
+                  {settings?.heroTitle || "جمعية العلوم الخيرية بعزبة الكوم"}
+                </h2>
                 <p className="text-sand-500 text-sm">
-                  {report.mode === "annual" ? `تقرير سنوي ${reportTitle} — سنة ${report.year}` : `تقرير شهري ${reportTitle} — ${monthLabel(month)}`}
+                  {report.mode === "annual"
+                    ? `تقرير سنوي ${reportTitle} — سنة ${report.year}`
+                    : `تقرير شهري ${reportTitle} — ${monthLabel(month)}`}
                 </p>
               </div>
             </div>
 
             {report.mode !== "annual" && (
-            <>
-            {report.type !== "branch" ? (
               <>
-                <div className="grid sm:grid-cols-2 gap-3 mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
-                  <div><span className="text-sand-500 text-sm">الاسم: </span><span className="font-bold">{report.person?.name}</span></div>
-                  {report.type === "student" ? (
-                    <>
-                      <div><span className="text-sand-500 text-sm">القسم: </span><span className="font-bold">{report.person?.department === "nursery" ? "الحضانة" : "الكتاب"}</span></div>
-                      <div><span className="text-sand-500 text-sm">المدرس: </span><span className="font-bold">{report.person?.teacher?.name || "—"}</span></div>
-                      <div><span className="text-sand-500 text-sm">ولي الأمر: </span><span className="font-bold">{report.person?.guardianName || "—"}</span></div>
-                    </>
-                  ) : (
-                    <>
-                      <div><span className="text-sand-500 text-sm">الوظيفة: </span><span className="font-bold">{report.person?.jobTitle || "—"}</span></div>
-                      <div><span className="text-sand-500 text-sm">القسم: </span><span className="font-bold">{report.person?.department === "nursery" ? "الحضانة" : report.person?.department === "quran" ? "الكتاب" : "الاثنين"}</span></div>
-                    </>
-                  )}
-                </div>
-
-                <ReportSection title="الحضور والغياب">
-                  <div className="grid grid-cols-4 gap-3">
-                    <MiniStat label="حاضر" value={report.attendance.present} color="text-primary-700" />
-                    <MiniStat label="غائب" value={report.attendance.absent} color="text-red-600" />
-                    <MiniStat label="متأخر" value={report.attendance.late} color="text-amber-600" />
-                    <MiniStat label="مُعتذر" value={report.attendance.excused} color="text-sand-500" />
-                  </div>
-                </ReportSection>
-
-                <ReportSection title="الحفظ الشهري">
-                  {report.hifz ? (
-                    <div className="space-y-3 text-sm">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-primary-50 rounded-xl px-3 py-2 text-center">
-                          <p className="text-xs text-primary-600 mb-1">📖 الحفظ الجديد</p>
-                          <p className="text-lg font-extrabold text-primary-700">
-                            {formatPagesOrJuz(report.hifz.totalMemPages)}
-                            {report.hifz.expectedPages > 0 && (
-                              <span className="text-xs font-normal text-primary-500"> من {formatPagesOrJuz(report.hifz.expectedPages)}</span>
-                            )}
-                          </p>
-                        </div>
-                        <div className="bg-sand-100 rounded-xl px-3 py-2 text-center">
-                          <p className="text-xs text-sand-500 mb-1">🔄 المراجعة</p>
-                          <p className="text-lg font-extrabold text-sand-700">
-                            {formatPagesOrJuz(report.hifz.totalRevisionPages)}
-                            {report.hifz.expectedRevisionPages > 0 && (
-                              <span className="text-xs font-normal text-sand-500"> من {formatPagesOrJuz(report.hifz.expectedRevisionPages)}</span>
-                            )}
-                          </p>
-                        </div>
+                {report.type !== "branch" ? (
+                  <>
+                    <div className="grid sm:grid-cols-2 gap-3 mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
+                      <div>
+                        <span className="text-sand-500 text-sm">الاسم: </span>
+                        <span className="font-bold">{report.person?.name}</span>
                       </div>
-                      {memRange(report.hifz) && (
-                        <p><span className="text-sand-500">الحفظ الجديد: </span><span className="font-semibold">{memRange(report.hifz)}</span></p>
+                      {report.type === "student" ? (
+                        <>
+                          <div>
+                            <span className="text-sand-500 text-sm">
+                              القسم:{" "}
+                            </span>
+                            <span className="font-bold">
+                              {report.person?.department === "nursery"
+                                ? "الحضانة"
+                                : "الكتاب"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-sand-500 text-sm">
+                              المدرس:{" "}
+                            </span>
+                            <span className="font-bold">
+                              {report.person?.teacher?.name || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-sand-500 text-sm">
+                              ولي الأمر:{" "}
+                            </span>
+                            <span className="font-bold">
+                              {report.person?.guardianName || "—"}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <span className="text-sand-500 text-sm">
+                              الوظيفة:{" "}
+                            </span>
+                            <span className="font-bold">
+                              {report.person?.jobTitle || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-sand-500 text-sm">
+                              القسم:{" "}
+                            </span>
+                            <span className="font-bold">
+                              {report.person?.department === "nursery"
+                                ? "الحضانة"
+                                : report.person?.department === "quran"
+                                  ? "الكتاب"
+                                  : "الاثنين"}
+                            </span>
+                          </div>
+                        </>
                       )}
-                      {revRange(report.hifz) && (
-                        <p><span className="text-sand-500">المراجعة: </span><span className="font-semibold">{revRange(report.hifz)}</span></p>
-                      )}
-                      {(report.hifz.mutoonFrom || report.hifz.mutoonTo) && (
-                        <p><span className="text-sand-500">المتون: </span><span className="font-semibold">من {report.hifz.mutoonFrom || "—"} إلى {report.hifz.mutoonTo || "—"}</span></p>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        {report.hifz.grade && (
-                          <span className="badge bg-primary-50 text-primary-700">تقييم الحفظ: {GRADE_LABELS[report.hifz.grade]}</span>
-                        )}
-                        {report.hifz.revGrade && (
-                          <span className="badge bg-sky-50 text-sky-700">تقييم المراجعة: {GRADE_LABELS[report.hifz.revGrade]}</span>
-                        )}
-                      </div>
-                      {report.hifz.notes && <p className="text-sand-500 pt-1">ملاحظات: {report.hifz.notes}</p>}
                     </div>
-                  ) : (
-                    <EmptyNote text="لا يوجد سجل حفظ لهذا الشهر" />
-                  )}
-                </ReportSection>
 
-                {report.type === "student" && (
-                  <>
-                    <ReportSection title="التقييمات">
-                      {report.evaluations.length > 0 ? (
-                        <PrintTable
-                          headers={["التاريخ", "الفترة", "التقييم العام", "الحفظ", "السلوك", "المشاركة", "ملاحظات"]}
-                          rows={report.evaluations.map((ev) => [
-                            ev.date?.slice(0, 10),
-                            PERIOD_LABELS[ev.period],
-                            `${ev.rating}/5`,
-                            ev.memorization ? `${ev.memorization}/5` : "—",
-                            ev.behavior ? `${ev.behavior}/5` : "—",
-                            ev.participation ? `${ev.participation}/5` : "—",
-                            ev.notes || "—",
-                          ])}
+                    <ReportSection title="الحضور والغياب">
+                      <div className="grid grid-cols-4 gap-3">
+                        <MiniStat
+                          label="حاضر"
+                          value={report.attendance.present}
+                          color="text-primary-700"
                         />
+                        <MiniStat
+                          label="غائب"
+                          value={report.attendance.absent}
+                          color="text-red-600"
+                        />
+                        <MiniStat
+                          label="متأخر"
+                          value={report.attendance.late}
+                          color="text-amber-600"
+                        />
+                        <MiniStat
+                          label="مُعتذر"
+                          value={report.attendance.excused}
+                          color="text-sand-500"
+                        />
+                      </div>
+                    </ReportSection>
+
+                    <ReportSection title="الحفظ الشهري">
+                      {report.hifz ? (
+                        <div className="space-y-3 text-sm">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-primary-50 rounded-xl px-3 py-2 text-center">
+                              <p className="text-xs text-primary-600 mb-1">
+                                📖 الحفظ الجديد
+                              </p>
+                              <p className="text-lg font-extrabold text-primary-700">
+                                {formatPagesOrJuz(report.hifz.totalMemPages)}
+                                {report.hifz.expectedPages > 0 && (
+                                  <span className="text-xs font-normal text-primary-500">
+                                    {" "}
+                                    من{" "}
+                                    {formatPagesOrJuz(
+                                      report.hifz.expectedPages,
+                                    )}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="bg-sand-100 rounded-xl px-3 py-2 text-center">
+                              <p className="text-xs text-sand-500 mb-1">
+                                {" "}
+                                المراجعة
+                              </p>
+                              <p className="text-lg font-extrabold text-sand-700">
+                                {formatPagesOrJuz(
+                                  report.hifz.totalRevisionPages,
+                                )}
+                                {report.hifz.expectedRevisionPages > 0 && (
+                                  <span className="text-xs font-normal text-sand-500">
+                                    {" "}
+                                    من{" "}
+                                    {formatPagesOrJuz(
+                                      report.hifz.expectedRevisionPages,
+                                    )}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          {memRange(report.hifz) && (
+                            <p>
+                              <span className="text-sand-500">
+                                الحفظ الجديد:{" "}
+                              </span>
+                              <span className="font-semibold">
+                                {memRange(report.hifz)}
+                              </span>
+                            </p>
+                          )}
+                          {revRange(report.hifz) && (
+                            <p>
+                              <span className="text-sand-500">المراجعة: </span>
+                              <span className="font-semibold">
+                                {revRange(report.hifz)}
+                              </span>
+                            </p>
+                          )}
+                          {(report.hifz.mutoonFrom || report.hifz.mutoonTo) && (
+                            <p>
+                              <span className="text-sand-500">المتون: </span>
+                              <span className="font-semibold">
+                                من {report.hifz.mutoonFrom || "—"} إلى{" "}
+                                {report.hifz.mutoonTo || "—"}
+                              </span>
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {report.hifz.grade && (
+                              <span className="badge bg-primary-50 text-primary-700">
+                                تقييم الحفظ: {GRADE_LABELS[report.hifz.grade]}
+                              </span>
+                            )}
+                            {report.hifz.revGrade && (
+                              <span className="badge bg-sky-50 text-sky-700">
+                                تقييم المراجعة:{" "}
+                                {GRADE_LABELS[report.hifz.revGrade]}
+                              </span>
+                            )}
+                          </div>
+                          {report.hifz.notes && (
+                            <p className="text-sand-500 pt-1">
+                              ملاحظات: {report.hifz.notes}
+                            </p>
+                          )}
+                        </div>
                       ) : (
-                        <EmptyNote text="لا توجد تقييمات هذا الشهر" />
+                        <EmptyNote text="لا يوجد سجل حفظ لهذا الشهر" />
                       )}
                     </ReportSection>
 
-                    <ReportSection title="الاختبارات (التسميع)">
-                      {report.tests.length > 0 ? (
-                        <PrintTable
-                          headers={["التاريخ", "النوع", "العنوان", "الدرجة"]}
-                          rows={report.tests.map((t) => [t.date?.slice(0, 10), t.type === "weekly" ? "أسبوعي" : "شهري", t.title, `${t.score}/${t.maxScore}`])}
-                        />
-                      ) : (
-                        <EmptyNote text="لا توجد نتائج اختبارات هذا الشهر" />
-                      )}
-                    </ReportSection>
+                    {report.type === "student" && (
+                      <>
+                        <ReportSection title="التقييمات">
+                          {report.evaluations.length > 0 ? (
+                            <PrintTable
+                              headers={[
+                                "التاريخ",
+                                "الفترة",
+                                "التقييم العام",
+                                "الحفظ",
+                                "السلوك",
+                                "المشاركة",
+                                "ملاحظات",
+                              ]}
+                              rows={report.evaluations.map((ev) => [
+                                ev.date?.slice(0, 10),
+                                PERIOD_LABELS[ev.period],
+                                `${ev.rating}/5`,
+                                ev.memorization ? `${ev.memorization}/5` : "—",
+                                ev.behavior ? `${ev.behavior}/5` : "—",
+                                ev.participation
+                                  ? `${ev.participation}/5`
+                                  : "—",
+                                ev.notes || "—",
+                              ])}
+                            />
+                          ) : (
+                            <EmptyNote text="لا توجد تقييمات هذا الشهر" />
+                          )}
+                        </ReportSection>
+
+                        <ReportSection title="الاختبارات (التسميع)">
+                          {report.tests.length > 0 ? (
+                            <PrintTable
+                              headers={[
+                                "التاريخ",
+                                "النوع",
+                                "العنوان",
+                                "الدرجة",
+                              ]}
+                              rows={report.tests.map((t) => [
+                                t.date?.slice(0, 10),
+                                t.type === "weekly" ? "أسبوعي" : "شهري",
+                                t.title,
+                                `${t.score}/${t.maxScore}`,
+                              ])}
+                            />
+                          ) : (
+                            <EmptyNote text="لا توجد نتائج اختبارات هذا الشهر" />
+                          )}
+                        </ReportSection>
+                      </>
+                    )}
+
+                    {report.type === "employee" && (
+                      <>
+                        <ReportSection title="الراتب">
+                          {report.salary ? (
+                            <PrintTable
+                              headers={[
+                                "الأساسي",
+                                "المكافآت",
+                                "الخصومات",
+                                "الصافي",
+                                "الحالة",
+                              ]}
+                              rows={[
+                                [
+                                  `${report.salary.baseSalary} جنيه`,
+                                  `${report.salary.bonuses} جنيه`,
+                                  `${report.salary.deductions} جنيه`,
+                                  `${report.salary.netSalary} جنيه`,
+                                  report.salary.paid ? "مدفوع" : "غير مدفوع",
+                                ],
+                              ]}
+                            />
+                          ) : (
+                            <EmptyNote text="لا يوجد راتب مسجل لهذا الشهر" />
+                          )}
+                        </ReportSection>
+
+                        <ReportSection title="الإجازات">
+                          {report.leaves.length > 0 ? (
+                            <PrintTable
+                              headers={["من", "إلى", "السبب", "الحالة"]}
+                              rows={report.leaves.map((l) => [
+                                l.startDate?.slice(0, 10),
+                                l.endDate?.slice(0, 10),
+                                l.reason,
+                                l.status === "approved"
+                                  ? "مقبولة"
+                                  : l.status === "rejected"
+                                    ? "مرفوضة"
+                                    : "قيد المراجعة",
+                              ])}
+                            />
+                          ) : (
+                            <EmptyNote text="لا توجد إجازات هذا الشهر" />
+                          )}
+                        </ReportSection>
+                      </>
+                    )}
                   </>
-                )}
-
-                {report.type === "employee" && (
+                ) : (
                   <>
-                    <ReportSection title="الراتب">
-                      {report.salary ? (
-                        <PrintTable
-                          headers={["الأساسي", "المكافآت", "الخصومات", "الصافي", "الحالة"]}
-                          rows={[[
-                            `${report.salary.baseSalary} جنيه`,
-                            `${report.salary.bonuses} جنيه`,
-                            `${report.salary.deductions} جنيه`,
-                            `${report.salary.netSalary} جنيه`,
-                            report.salary.paid ? "مدفوع" : "غير مدفوع",
-                          ]]}
+                    <div className="mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
+                      <span className="text-sand-500 text-sm">الفرع: </span>
+                      <span className="font-bold text-lg">
+                        {report.branch?.name}
+                      </span>
+                    </div>
+
+                    <ReportSection title="نظرة عامة">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <MiniStat
+                          label="إجمالي الطلاب"
+                          value={report.studentsCount}
+                          color="text-primary-700"
                         />
+                        <MiniStat
+                          label="طلاب الحضانة"
+                          value={report.nurseryCount}
+                          color="text-primary-700"
+                        />
+                        <MiniStat
+                          label="طلاب الكتاب"
+                          value={report.quranCount}
+                          color="text-sand-700"
+                        />
+                        <MiniStat
+                          label="عدد الموظفين"
+                          value={report.employeesCount}
+                          color="text-sand-700"
+                        />
+                      </div>
+                    </ReportSection>
+
+                    <ReportSection title="ملخص حضور الطلاب">
+                      {(() => {
+                        const rates = attendanceRates(report.studentAttendance);
+                        return (
+                          <div className="grid grid-cols-4 gap-3">
+                            <MiniStat
+                              label="نسبة الحضور"
+                              value={`${rates.presentRate}%`}
+                              color="text-primary-700"
+                            />
+                            <MiniStat
+                              label="نسبة الغياب"
+                              value={`${rates.absentRate}%`}
+                              color="text-red-600"
+                            />
+                            <MiniStat
+                              label="نسبة التأخير"
+                              value={`${rates.lateRate}%`}
+                              color="text-amber-600"
+                            />
+                            <MiniStat
+                              label="نسبة الأعذار"
+                              value={`${rates.excusedRate}%`}
+                              color="text-sand-500"
+                            />
+                          </div>
+                        );
+                      })()}
+                    </ReportSection>
+
+                    <ReportSection title="ملخص حضور الموظفين">
+                      {(() => {
+                        const rates = attendanceRates(
+                          report.employeeAttendance,
+                        );
+                        return (
+                          <div className="grid grid-cols-4 gap-3">
+                            <MiniStat
+                              label="نسبة الحضور"
+                              value={`${rates.presentRate}%`}
+                              color="text-primary-700"
+                            />
+                            <MiniStat
+                              label="نسبة الغياب"
+                              value={`${rates.absentRate}%`}
+                              color="text-red-600"
+                            />
+                            <MiniStat
+                              label="نسبة التأخير"
+                              value={`${rates.lateRate}%`}
+                              color="text-amber-600"
+                            />
+                            <MiniStat
+                              label="نسبة الأعذار"
+                              value={`${rates.excusedRate}%`}
+                              color="text-sand-500"
+                            />
+                          </div>
+                        );
+                      })()}
+                    </ReportSection>
+
+                    <ReportSection title="الملخص المالي">
+                      <PrintTable
+                        headers={["البند", "القيمة"]}
+                        rows={[
+                          [
+                            "إجمالي الإيرادات (المدفوعات)",
+                            `${report.totalIncome.toLocaleString("ar-EG")} جنيه (${report.paymentsCount} دفعة)`,
+                          ],
+                          [
+                            "إجمالي المصروفات",
+                            `${report.totalExpenses.toLocaleString("ar-EG")} جنيه (${report.expensesCount} مصروف)`,
+                          ],
+                          [
+                            "صافي الفرع هذا الشهر",
+                            `${(report.totalIncome - report.totalExpenses).toLocaleString("ar-EG")} جنيه`,
+                          ],
+                        ]}
+                      />
+                    </ReportSection>
+
+                    <ReportSection title="الرواتب">
+                      {report.salaries.length > 0 ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            <MiniStat
+                              label="عدد الرواتب المسجلة"
+                              value={report.salaries.length}
+                              color="text-sand-700"
+                            />
+                            <MiniStat
+                              label="مدفوعة"
+                              value={
+                                report.salaries.filter((s) => s.paid).length
+                              }
+                              color="text-primary-700"
+                            />
+                            <MiniStat
+                              label="غير مدفوعة"
+                              value={
+                                report.salaries.filter((s) => !s.paid).length
+                              }
+                              color="text-red-600"
+                            />
+                          </div>
+                          <PrintTable
+                            headers={["الموظف", "الصافي", "الحالة"]}
+                            rows={report.salaries.map((s) => [
+                              s.employee?.name,
+                              `${s.netSalary} جنيه`,
+                              s.paid ? "مدفوع" : "غير مدفوع",
+                            ])}
+                          />
+                        </>
                       ) : (
-                        <EmptyNote text="لا يوجد راتب مسجل لهذا الشهر" />
+                        <EmptyNote text="لا توجد رواتب مسجلة هذا الشهر" />
                       )}
                     </ReportSection>
 
-                    <ReportSection title="الإجازات">
+                    <ReportSection title="تقييمات الطلاب والحفظ الشهري">
+                      <div className="grid grid-cols-2 gap-3">
+                        <MiniStat
+                          label="عدد التقييمات"
+                          value={report.evaluationsCount}
+                          color="text-sand-700"
+                        />
+                        <MiniStat
+                          label="عدد سجلات الحفظ"
+                          value={report.hifzCount}
+                          color="text-sand-700"
+                        />
+                      </div>
+                      {report.avgRating && (
+                        <p className="text-sand-700 mt-2">
+                          متوسط تقييم الطلاب:{" "}
+                          <strong>{report.avgRating} / 5</strong>
+                        </p>
+                      )}
+                    </ReportSection>
+
+                    <ReportSection title="طلبات الإجازة">
                       {report.leaves.length > 0 ? (
                         <PrintTable
-                          headers={["من", "إلى", "السبب", "الحالة"]}
+                          headers={["الموظف", "من", "إلى", "الحالة"]}
                           rows={report.leaves.map((l) => [
+                            l.employee?.name,
                             l.startDate?.slice(0, 10),
                             l.endDate?.slice(0, 10),
-                            l.reason,
-                            l.status === "approved" ? "مقبولة" : l.status === "rejected" ? "مرفوضة" : "قيد المراجعة",
+                            l.status === "approved"
+                              ? "مقبولة"
+                              : l.status === "rejected"
+                                ? "مرفوضة"
+                                : "قيد المراجعة",
                           ])}
                         />
                       ) : (
                         <EmptyNote text="لا توجد إجازات هذا الشهر" />
                       )}
                     </ReportSection>
+
+                    <ReportSection title="مسابقات الموظفين">
+                      {report.competitions.length > 0 ? (
+                        <PrintTable
+                          headers={["العنوان", "التاريخ", "الفائز"]}
+                          rows={report.competitions.map((c) => [
+                            c.title,
+                            c.date?.slice(0, 10),
+                            c.winner?.name || "—",
+                          ])}
+                        />
+                      ) : (
+                        <EmptyNote text="لا توجد مسابقات هذا الشهر" />
+                      )}
+                    </ReportSection>
                   </>
                 )}
+
+                {report.type === "student" && (
+                  <div className="grid grid-cols-2 gap-8 mt-10 pt-6">
+                    <div className="text-center">
+                      <div className="border-t border-sand-400 pt-2 mt-8 mx-6">
+                        <p className="text-sand-600 text-sm font-semibold">
+                          توقيع ولي الأمر
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="border-t border-sand-400 pt-2 mt-8 mx-6">
+                        <p className="text-sand-600 text-sm font-semibold">
+                          توقيع مدير الفرع
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
-            ) : (
-              <>
-                <div className="mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
-                  <span className="text-sand-500 text-sm">الفرع: </span>
-                  <span className="font-bold text-lg">{report.branch?.name}</span>
-                </div>
-
-                <ReportSection title="نظرة عامة">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <MiniStat label="إجمالي الطلاب" value={report.studentsCount} color="text-primary-700" />
-                    <MiniStat label="طلاب الحضانة" value={report.nurseryCount} color="text-primary-700" />
-                    <MiniStat label="طلاب الكتاب" value={report.quranCount} color="text-sand-700" />
-                    <MiniStat label="عدد الموظفين" value={report.employeesCount} color="text-sand-700" />
-                  </div>
-                </ReportSection>
-
-                <ReportSection title="ملخص حضور الطلاب">
-                  {(() => {
-                    const rates = attendanceRates(report.studentAttendance);
-                    return (
-                      <div className="grid grid-cols-4 gap-3">
-                        <MiniStat label="نسبة الحضور" value={`${rates.presentRate}%`} color="text-primary-700" />
-                        <MiniStat label="نسبة الغياب" value={`${rates.absentRate}%`} color="text-red-600" />
-                        <MiniStat label="نسبة التأخير" value={`${rates.lateRate}%`} color="text-amber-600" />
-                        <MiniStat label="نسبة الأعذار" value={`${rates.excusedRate}%`} color="text-sand-500" />
-                      </div>
-                    );
-                  })()}
-                </ReportSection>
-
-                <ReportSection title="ملخص حضور الموظفين">
-                  {(() => {
-                    const rates = attendanceRates(report.employeeAttendance);
-                    return (
-                      <div className="grid grid-cols-4 gap-3">
-                        <MiniStat label="نسبة الحضور" value={`${rates.presentRate}%`} color="text-primary-700" />
-                        <MiniStat label="نسبة الغياب" value={`${rates.absentRate}%`} color="text-red-600" />
-                        <MiniStat label="نسبة التأخير" value={`${rates.lateRate}%`} color="text-amber-600" />
-                        <MiniStat label="نسبة الأعذار" value={`${rates.excusedRate}%`} color="text-sand-500" />
-                      </div>
-                    );
-                  })()}
-                </ReportSection>
-
-                <ReportSection title="الملخص المالي">
-                  <PrintTable
-                    headers={["البند", "القيمة"]}
-                    rows={[
-                      ["إجمالي الإيرادات (المدفوعات)", `${report.totalIncome.toLocaleString("ar-EG")} جنيه (${report.paymentsCount} دفعة)`],
-                      ["إجمالي المصروفات", `${report.totalExpenses.toLocaleString("ar-EG")} جنيه (${report.expensesCount} مصروف)`],
-                      ["صافي الفرع هذا الشهر", `${(report.totalIncome - report.totalExpenses).toLocaleString("ar-EG")} جنيه`],
-                    ]}
-                  />
-                </ReportSection>
-
-                <ReportSection title="الرواتب">
-                  {report.salaries.length > 0 ? (
-                    <>
-                      <div className="grid grid-cols-3 gap-3 mb-3">
-                        <MiniStat label="عدد الرواتب المسجلة" value={report.salaries.length} color="text-sand-700" />
-                        <MiniStat label="مدفوعة" value={report.salaries.filter((s) => s.paid).length} color="text-primary-700" />
-                        <MiniStat label="غير مدفوعة" value={report.salaries.filter((s) => !s.paid).length} color="text-red-600" />
-                      </div>
-                      <PrintTable
-                        headers={["الموظف", "الصافي", "الحالة"]}
-                        rows={report.salaries.map((s) => [s.employee?.name, `${s.netSalary} جنيه`, s.paid ? "مدفوع" : "غير مدفوع"])}
-                      />
-                    </>
-                  ) : (
-                    <EmptyNote text="لا توجد رواتب مسجلة هذا الشهر" />
-                  )}
-                </ReportSection>
-
-                <ReportSection title="تقييمات الطلاب والحفظ الشهري">
-                  <div className="grid grid-cols-2 gap-3">
-                    <MiniStat label="عدد التقييمات" value={report.evaluationsCount} color="text-sand-700" />
-                    <MiniStat label="عدد سجلات الحفظ" value={report.hifzCount} color="text-sand-700" />
-                  </div>
-                  {report.avgRating && <p className="text-sand-700 mt-2">متوسط تقييم الطلاب: <strong>{report.avgRating} / 5</strong></p>}
-                </ReportSection>
-
-                <ReportSection title="طلبات الإجازة">
-                  {report.leaves.length > 0 ? (
-                    <PrintTable
-                      headers={["الموظف", "من", "إلى", "الحالة"]}
-                      rows={report.leaves.map((l) => [
-                        l.employee?.name,
-                        l.startDate?.slice(0, 10),
-                        l.endDate?.slice(0, 10),
-                        l.status === "approved" ? "مقبولة" : l.status === "rejected" ? "مرفوضة" : "قيد المراجعة",
-                      ])}
-                    />
-                  ) : (
-                    <EmptyNote text="لا توجد إجازات هذا الشهر" />
-                  )}
-                </ReportSection>
-
-                <ReportSection title="مسابقات الموظفين">
-                  {report.competitions.length > 0 ? (
-                    <PrintTable
-                      headers={["العنوان", "التاريخ", "الفائز"]}
-                      rows={report.competitions.map((c) => [c.title, c.date?.slice(0, 10), c.winner?.name || "—"])}
-                    />
-                  ) : (
-                    <EmptyNote text="لا توجد مسابقات هذا الشهر" />
-                  )}
-                </ReportSection>
-              </>
-            )}
-
-            {report.type === "student" && (
-              <div className="grid grid-cols-2 gap-8 mt-10 pt-6">
-                <div className="text-center">
-                  <div className="border-t border-sand-400 pt-2 mt-8 mx-6">
-                    <p className="text-sand-600 text-sm font-semibold">توقيع ولي الأمر</p>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="border-t border-sand-400 pt-2 mt-8 mx-6">
-                    <p className="text-sand-600 text-sm font-semibold">توقيع مدير الفرع</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            </>
             )}
 
             {report.mode === "annual" && <AnnualReportBody report={report} />}
 
             <div className="mt-8 pt-4 border-t border-sand-200 text-center text-xs text-sand-400">
-              تم إصدار هذا التقرير آليًا من نظام إدارة {settings?.heroTitle || "الجمعية"} بتاريخ {new Date().toLocaleDateString("ar-EG")}
+              تم إصدار هذا التقرير آليًا من نظام إدارة{" "}
+              {settings?.heroTitle || "الجمعية"} بتاريخ{" "}
+              {new Date().toLocaleDateString("ar-EG")}
             </div>
           </div>
         </div>
@@ -832,38 +1304,93 @@ const AnnualReportBody = ({ report }) => {
   if (type === "student") {
     const totalPresent = months.reduce((s, d) => s + d.attendance.present, 0);
     const totalAbsent = months.reduce((s, d) => s + d.attendance.absent, 0);
-    const totalMem = months.reduce((s, d) => s + (d.hifz?.totalMemPages || 0), 0);
-    const totalRev = months.reduce((s, d) => s + (d.hifz?.totalRevisionPages || 0), 0);
+    const totalMem = months.reduce(
+      (s, d) => s + (d.hifz?.totalMemPages || 0),
+      0,
+    );
+    const totalRev = months.reduce(
+      (s, d) => s + (d.hifz?.totalRevisionPages || 0),
+      0,
+    );
     return (
       <>
         <div className="grid sm:grid-cols-2 gap-3 mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
-          <div><span className="text-sand-500 text-sm">الاسم: </span><span className="font-bold">{report.person?.name}</span></div>
-          <div><span className="text-sand-500 text-sm">القسم: </span><span className="font-bold">{report.person?.department === "nursery" ? "الحضانة" : "الكتاب"}</span></div>
-          <div><span className="text-sand-500 text-sm">المدرس: </span><span className="font-bold">{report.person?.teacher?.name || "—"}</span></div>
-          <div><span className="text-sand-500 text-sm">ولي الأمر: </span><span className="font-bold">{report.person?.guardianName || "—"}</span></div>
+          <div>
+            <span className="text-sand-500 text-sm">الاسم: </span>
+            <span className="font-bold">{report.person?.name}</span>
+          </div>
+          <div>
+            <span className="text-sand-500 text-sm">القسم: </span>
+            <span className="font-bold">
+              {report.person?.department === "nursery" ? "الحضانة" : "الكتاب"}
+            </span>
+          </div>
+          <div>
+            <span className="text-sand-500 text-sm">المدرس: </span>
+            <span className="font-bold">
+              {report.person?.teacher?.name || "—"}
+            </span>
+          </div>
+          <div>
+            <span className="text-sand-500 text-sm">ولي الأمر: </span>
+            <span className="font-bold">
+              {report.person?.guardianName || "—"}
+            </span>
+          </div>
         </div>
 
         <ReportSection title={`ملخص السنة (${months.length} شهر مسجّل)`}>
           <div className="grid grid-cols-4 gap-3">
-            <MiniStat label="إجمالي أيام الحضور" value={totalPresent} color="text-primary-700" />
-            <MiniStat label="إجمالي أيام الغياب" value={totalAbsent} color="text-red-600" />
-            <MiniStat label="إجمالي الحفظ الجديد" value={formatPagesOrJuz(totalMem)} color="text-primary-700" />
-            <MiniStat label="إجمالي المراجعة" value={formatPagesOrJuz(totalRev)} color="text-sand-700" />
+            <MiniStat
+              label="إجمالي أيام الحضور"
+              value={totalPresent}
+              color="text-primary-700"
+            />
+            <MiniStat
+              label="إجمالي أيام الغياب"
+              value={totalAbsent}
+              color="text-red-600"
+            />
+            <MiniStat
+              label="إجمالي الحفظ الجديد"
+              value={formatPagesOrJuz(totalMem)}
+              color="text-primary-700"
+            />
+            <MiniStat
+              label="إجمالي المراجعة"
+              value={formatPagesOrJuz(totalRev)}
+              color="text-sand-700"
+            />
           </div>
         </ReportSection>
 
         <ReportSection title="التفصيل الشهري">
           <PrintTable
-            headers={["الشهر", "حاضر", "غائب", "الحفظ الجديد", "المراجعة", "تقييم الحفظ", "تقييم المراجعة", "متوسط التقييم"]}
+            headers={[
+              "الشهر",
+              "حاضر",
+              "غائب",
+              "الحفظ الجديد",
+              "المراجعة",
+              "تقييم الحفظ",
+              "تقييم المراجعة",
+              "متوسط التقييم",
+            ]}
             rows={months.map((d) => [
               monthLabel(d.month),
               d.attendance.present,
               d.attendance.absent,
-              d.hifz ? `${formatPagesOrJuz(d.hifz.totalMemPages)}${d.hifz.expectedPages > 0 ? ` من ${formatPagesOrJuz(d.hifz.expectedPages)}` : ""}` : "—",
-              d.hifz ? `${formatPagesOrJuz(d.hifz.totalRevisionPages)}${d.hifz.expectedRevisionPages > 0 ? ` من ${formatPagesOrJuz(d.hifz.expectedRevisionPages)}` : ""}` : "—",
+              d.hifz
+                ? `${formatPagesOrJuz(d.hifz.totalMemPages)}${d.hifz.expectedPages > 0 ? ` من ${formatPagesOrJuz(d.hifz.expectedPages)}` : ""}`
+                : "—",
+              d.hifz
+                ? `${formatPagesOrJuz(d.hifz.totalRevisionPages)}${d.hifz.expectedRevisionPages > 0 ? ` من ${formatPagesOrJuz(d.hifz.expectedRevisionPages)}` : ""}`
+                : "—",
               d.hifz?.grade ? GRADE_LABELS[d.hifz.grade] : "—",
               d.hifz?.revGrade ? GRADE_LABELS[d.hifz.revGrade] : "—",
-              d.evaluations.length ? `${(d.evaluations.reduce((s, e) => s + e.rating, 0) / d.evaluations.length).toFixed(1)}/5` : "—",
+              d.evaluations.length
+                ? `${(d.evaluations.reduce((s, e) => s + e.rating, 0) / d.evaluations.length).toFixed(1)}/5`
+                : "—",
             ])}
           />
         </ReportSection>
@@ -878,21 +1405,46 @@ const AnnualReportBody = ({ report }) => {
     return (
       <>
         <div className="grid sm:grid-cols-2 gap-3 mb-6 bg-sand-50 rounded-xl p-4 print:bg-transparent">
-          <div><span className="text-sand-500 text-sm">الاسم: </span><span className="font-bold">{report.person?.name}</span></div>
-          <div><span className="text-sand-500 text-sm">الوظيفة: </span><span className="font-bold">{report.person?.jobTitle || "—"}</span></div>
+          <div>
+            <span className="text-sand-500 text-sm">الاسم: </span>
+            <span className="font-bold">{report.person?.name}</span>
+          </div>
+          <div>
+            <span className="text-sand-500 text-sm">الوظيفة: </span>
+            <span className="font-bold">{report.person?.jobTitle || "—"}</span>
+          </div>
         </div>
 
         <ReportSection title={`ملخص السنة (${months.length} شهر مسجّل)`}>
           <div className="grid grid-cols-3 gap-3">
-            <MiniStat label="إجمالي أيام الحضور" value={totalPresent} color="text-primary-700" />
-            <MiniStat label="إجمالي أيام الغياب" value={totalAbsent} color="text-red-600" />
-            <MiniStat label="إجمالي صافي الرواتب" value={`${totalNet.toLocaleString("ar-EG")} جنيه`} color="text-sand-700" />
+            <MiniStat
+              label="إجمالي أيام الحضور"
+              value={totalPresent}
+              color="text-primary-700"
+            />
+            <MiniStat
+              label="إجمالي أيام الغياب"
+              value={totalAbsent}
+              color="text-red-600"
+            />
+            <MiniStat
+              label="إجمالي صافي الرواتب"
+              value={`${totalNet.toLocaleString("ar-EG")} جنيه`}
+              color="text-sand-700"
+            />
           </div>
         </ReportSection>
 
         <ReportSection title="التفصيل الشهري">
           <PrintTable
-            headers={["الشهر", "حاضر", "غائب", "صافي الراتب", "الحالة", "عدد الإجازات"]}
+            headers={[
+              "الشهر",
+              "حاضر",
+              "غائب",
+              "صافي الراتب",
+              "الحالة",
+              "عدد الإجازات",
+            ]}
             rows={months.map((d) => [
               monthLabel(d.month),
               d.attendance.present,
@@ -919,15 +1471,35 @@ const AnnualReportBody = ({ report }) => {
 
       <ReportSection title={`ملخص السنة (${months.length} شهر مسجّل)`}>
         <div className="grid grid-cols-3 gap-3">
-          <MiniStat label="إجمالي الإيرادات" value={`${totalIncome.toLocaleString("ar-EG")} جنيه`} color="text-primary-700" />
-          <MiniStat label="إجمالي المصروفات" value={`${totalExpenses.toLocaleString("ar-EG")} جنيه`} color="text-red-600" />
-          <MiniStat label="صافي السنة" value={`${(totalIncome - totalExpenses).toLocaleString("ar-EG")} جنيه`} color="text-sand-700" />
+          <MiniStat
+            label="إجمالي الإيرادات"
+            value={`${totalIncome.toLocaleString("ar-EG")} جنيه`}
+            color="text-primary-700"
+          />
+          <MiniStat
+            label="إجمالي المصروفات"
+            value={`${totalExpenses.toLocaleString("ar-EG")} جنيه`}
+            color="text-red-600"
+          />
+          <MiniStat
+            label="صافي السنة"
+            value={`${(totalIncome - totalExpenses).toLocaleString("ar-EG")} جنيه`}
+            color="text-sand-700"
+          />
         </div>
       </ReportSection>
 
       <ReportSection title="التفصيل الشهري">
         <PrintTable
-          headers={["الشهر", "إيرادات", "مصروفات", "صافي", "حضور الطلاب", "حضور الموظفين", "متوسط التقييم"]}
+          headers={[
+            "الشهر",
+            "إيرادات",
+            "مصروفات",
+            "صافي",
+            "حضور الطلاب",
+            "حضور الموظفين",
+            "متوسط التقييم",
+          ]}
           rows={months.map((d) => {
             const sr = attendanceRates(d.studentAttendance);
             const er = attendanceRates(d.employeeAttendance);
@@ -949,7 +1521,9 @@ const AnnualReportBody = ({ report }) => {
 
 const ReportSection = ({ title, children }) => (
   <div className="mb-6 break-inside-avoid">
-    <h3 className="font-bold text-sand-800 bg-sand-100 print:bg-sand-50 rounded-lg px-3 py-1.5 mb-3">{title}</h3>
+    <h3 className="font-bold text-sand-800 bg-sand-100 print:bg-sand-50 rounded-lg px-3 py-1.5 mb-3">
+      {title}
+    </h3>
     {children}
   </div>
 );
@@ -966,7 +1540,12 @@ const PrintTable = ({ headers, rows }) => (
     <thead>
       <tr>
         {headers.map((h) => (
-          <th key={h} className="text-right px-2 py-1.5 bg-sand-50 border-b border-sand-200 text-sand-600 font-semibold">{h}</th>
+          <th
+            key={h}
+            className="text-right px-2 py-1.5 bg-sand-50 border-b border-sand-200 text-sand-600 font-semibold"
+          >
+            {h}
+          </th>
         ))}
       </tr>
     </thead>
@@ -974,7 +1553,9 @@ const PrintTable = ({ headers, rows }) => (
       {rows.map((row, i) => (
         <tr key={i}>
           {row.map((cell, j) => (
-            <td key={j} className="px-2 py-1.5 border-b border-sand-100">{cell}</td>
+            <td key={j} className="px-2 py-1.5 border-b border-sand-100">
+              {cell}
+            </td>
           ))}
         </tr>
       ))}

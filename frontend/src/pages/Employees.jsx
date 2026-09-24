@@ -42,17 +42,25 @@ const Employees = () => {
 
   const load = () => {
     setLoading(true);
-    api.get("/users").then((res) => setUsers(res.data)).finally(() => setLoading(false));
+    api
+      .get("/users")
+      .then((res) => setUsers(res.data))
+      .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
   useEffect(() => {
-    if (user.role === "super_admin") api.get("/branches").then((res) => setBranches(res.data));
+    if (user.role === "super_admin")
+      api.get("/branches").then((res) => setBranches(res.data));
   }, []);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, branch: user.role !== "super_admin" ? user.branch?._id || user.branch : "" });
+    setForm({
+      ...emptyForm,
+      branch:
+        user.role !== "super_admin" ? user.branch?._id || user.branch : "",
+    });
     setPhotoFile(null);
     setPhotoPreview("");
     setError("");
@@ -115,7 +123,9 @@ const Employees = () => {
       if (photoFile && userId) {
         const fd = new FormData();
         fd.append("photo", photoFile);
-        await api.put(`/users/${userId}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+        await api.put(`/users/${userId}/photo`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
       setModalOpen(false);
       load();
@@ -141,7 +151,9 @@ const Employees = () => {
       if (branchId) params.branch = branchId;
       const res = await api.get("/students", { params });
       setGroupStudents(res.data);
-      const assigned = res.data.filter((s) => (s.teacher?._id || s.teacher) === teacher._id).map((s) => s._id);
+      const assigned = res.data
+        .filter((s) => (s.teacher?._id || s.teacher) === teacher._id)
+        .map((s) => s._id);
       setGroupSelected(new Set(assigned));
     } finally {
       setGroupLoading(false);
@@ -175,13 +187,19 @@ const Employees = () => {
     }
   };
 
-  const filteredGroupStudents = groupStudents.filter((s) => s.name.toLowerCase().includes(groupSearch.toLowerCase()));
+  const filteredGroupStudents = groupStudents.filter((s) =>
+    s.name.toLowerCase().includes(groupSearch.toLowerCase()),
+  );
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-sand-900">الموظفون ومديرو الفروع</h1>
-        <button className="btn-primary" onClick={openCreate}>+ إضافة</button>
+        <h1 className="text-2xl font-bold text-sand-900">
+          الموظفون ومديرو الفروع
+        </h1>
+        <button className="btn-primary" onClick={openCreate}>
+          + إضافة
+        </button>
       </div>
 
       <div className="card overflow-x-auto">
@@ -207,60 +225,115 @@ const Employees = () => {
                 <tr key={u._id}>
                   <td>
                     {u.photoUrl ? (
-                      <img src={resolveMediaUrl(u.photoUrl)} alt={u.name} className="w-9 h-9 rounded-full object-cover" />
+                      <img
+                        src={resolveMediaUrl(u.photoUrl)}
+                        alt={u.name}
+                        className="w-9 h-9 rounded-full object-cover"
+                      />
                     ) : (
-                      <div className="w-9 h-9 rounded-full bg-sand-100 flex items-center justify-center text-sand-400 text-xs">👤</div>
+                      <div className="w-9 h-9 rounded-full bg-sand-100 flex items-center justify-center text-sand-400 text-xs">
+                        👤
+                      </div>
                     )}
                   </td>
                   <td className="font-semibold">{u.name}</td>
                   <td>{u.username}</td>
                   <td>
-                    <span className="badge bg-sand-100 text-sand-700">{ROLE_LABELS[u.role]}</span>
+                    <span className="badge bg-sand-100 text-sand-700">
+                      {ROLE_LABELS[u.role]}
+                    </span>
                   </td>
-                  {user.role === "super_admin" && <td>{u.branch?.name || "—"}</td>}
+                  {user.role === "super_admin" && (
+                    <td>{u.branch?.name || "—"}</td>
+                  )}
                   <td>{u.jobTitle || "—"}</td>
                   <td>{u.phone || "—"}</td>
                   <td>
-                    <span className={`badge ${u.active ? "bg-primary-50 text-primary-700" : "bg-red-50 text-red-600"}`}>
+                    <span
+                      className={`badge ${u.active ? "bg-primary-50 text-primary-700" : "bg-red-50 text-red-600"}`}
+                    >
                       {u.active ? "نشط" : "متوقف"}
                     </span>
                   </td>
                   <td>
                     <div className="flex gap-2">
                       {u.role === "employee" && (
-                        <button className="btn-ghost" onClick={() => openTeacherGroup(u)}>👥 طلابه</button>
+                        <button
+                          className="btn-ghost"
+                          onClick={() => openTeacherGroup(u)}
+                        >
+                          👥 طلابه
+                        </button>
                       )}
-                      <button className="btn-ghost" onClick={() => openEdit(u)}>تعديل</button>
+                      <button className="btn-ghost" onClick={() => openEdit(u)}>
+                        تعديل
+                      </button>
                       {u.role !== "super_admin" && (
-                        <button className="btn-ghost text-red-500" onClick={() => setDeleteId(u._id)}>حذف</button>
+                        <button
+                          className="btn-ghost text-red-500"
+                          onClick={() => setDeleteId(u._id)}
+                        >
+                          حذف
+                        </button>
                       )}
                     </div>
                   </td>
                 </tr>
               ))}
               {users.length === 0 && (
-                <tr><td colSpan={9} className="text-center text-sand-400 py-8">لا يوجد مستخدمون</td></tr>
+                <tr>
+                  <td colSpan={9} className="text-center text-sand-400 py-8">
+                    لا يوجد مستخدمون
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "تعديل بيانات الموظف" : "إضافة موظف / مدير"} wide>
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editing ? "تعديل بيانات الموظف" : "إضافة موظف / مدير"}
+        wide
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">{error}</div>}
+          {error && (
+            <div className="bg-red-50 text-red-600 text-sm rounded-xl px-3 py-2">
+              {error}
+            </div>
+          )}
           <div className="flex items-center gap-4">
             {photoPreview ? (
-              <img src={photoPreview} alt="معاينة" className="w-16 h-16 rounded-full object-cover border border-sand-200" />
+              <img
+                src={photoPreview}
+                alt="معاينة"
+                className="w-16 h-16 rounded-full object-cover border border-sand-200"
+              />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-sand-100 flex items-center justify-center text-2xl text-sand-400">👤</div>
+              <div className="w-16 h-16 rounded-full bg-sand-100 flex items-center justify-center text-2xl text-sand-400">
+                👤
+              </div>
             )}
             <div className="flex-1">
               <label className="label">الصورة الشخصية</label>
               <div className="flex gap-2">
-                <input type="file" accept="image/*" onChange={handlePhotoChange} className="input" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="input"
+                />
                 {photoPreview && (
-                  <button type="button" className="btn-secondary" disabled={savingPhoto} onClick={handleRemovePhoto}>حذف</button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={savingPhoto}
+                    onClick={handleRemovePhoto}
+                  >
+                    حذف
+                  </button>
                 )}
               </div>
             </div>
@@ -268,24 +341,51 @@ const Employees = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">الاسم الكامل</label>
-              <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <input
+                className="input"
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
             </div>
             <div>
               <label className="label">اسم المستخدم</label>
-              <input className="input" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} disabled={!!editing} />
+              <input
+                className="input"
+                required
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                disabled={!!editing}
+              />
             </div>
             <div>
-              <label className="label">{editing ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}</label>
-              <input className="input" type="password" required={!editing} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <label className="label">
+                {editing ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}
+              </label>
+              <input
+                className="input"
+                type="password"
+                required={!editing}
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
             </div>
             <div>
               <label className="label">الهاتف</label>
-              <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <input
+                className="input"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
             </div>
             {user.role === "super_admin" && (
               <div>
                 <label className="label">الدور</label>
-                <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                <select
+                  className="input"
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                >
                   <option value="employee">موظف</option>
                   <option value="branch_manager">مدير فرع</option>
                   <option value="super_admin">أدمن رئيسي</option>
@@ -295,17 +395,30 @@ const Employees = () => {
             {user.role === "super_admin" && form.role !== "super_admin" && (
               <div>
                 <label className="label">الفرع</label>
-                <select className="input" required value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })}>
+                <select
+                  className="input"
+                  required
+                  value={form.branch}
+                  onChange={(e) => setForm({ ...form, branch: e.target.value })}
+                >
                   <option value="">اختر الفرع</option>
                   {branches.map((b) => (
-                    <option key={b._id} value={b._id}>{b.name}</option>
+                    <option key={b._id} value={b._id}>
+                      {b.name}
+                    </option>
                   ))}
                 </select>
               </div>
             )}
             <div>
               <label className="label">القسم</label>
-              <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
+              <select
+                className="input"
+                value={form.department}
+                onChange={(e) =>
+                  setForm({ ...form, department: e.target.value })
+                }
+              >
                 <option value="quran">الكتاب</option>
                 <option value="nursery">الحضانة</option>
                 <option value="both">الاثنين</option>
@@ -313,22 +426,43 @@ const Employees = () => {
             </div>
             <div>
               <label className="label">المسمى الوظيفي</label>
-              <input className="input" placeholder="مثال: مدرس، إداري" value={form.jobTitle} onChange={(e) => setForm({ ...form, jobTitle: e.target.value })} />
+              <input
+                className="input"
+                placeholder="مثال: مدرس، إداري"
+                value={form.jobTitle}
+                onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
+              />
             </div>
             <div>
               <label className="label">الراتب الأساسي</label>
-              <input className="input" type="number" value={form.baseSalary} onChange={(e) => setForm({ ...form, baseSalary: e.target.value })} />
+              <input
+                className="input"
+                type="number"
+                value={form.baseSalary}
+                onChange={(e) =>
+                  setForm({ ...form, baseSalary: e.target.value })
+                }
+              />
             </div>
           </div>
-          <button className="btn-primary w-full justify-center">{editing ? "حفظ التعديلات" : "إضافة"}</button>
+          <button className="btn-primary w-full justify-center">
+            {editing ? "حفظ التعديلات" : "إضافة"}
+          </button>
         </form>
       </Modal>
 
-      <Modal open={!!groupTeacher} onClose={closeTeacherGroup} title={groupTeacher ? `طلاب ${groupTeacher.name}` : ""} wide>
+      <Modal
+        open={!!groupTeacher}
+        onClose={closeTeacherGroup}
+        title={groupTeacher ? `طلاب ${groupTeacher.name}` : ""}
+        wide
+      >
         {groupTeacher && (
           <div>
             <p className="text-xs text-sand-400 mb-3">
-              حدد كل الطلاب اللي المفروض يكونوا مع {groupTeacher.name} دفعة واحدة. أي طالب كان معينله قبل كده وشيلته من الاختيار، هيترفع منه المدرس تلقائيًا.
+              حدد كل الطلاب اللي المفروض يكونوا مع {groupTeacher.name} دفعة
+              واحدة. أي طالب كان معينله قبل كده وشيلته من الاختيار، هيترفع منه
+              المدرس تلقائيًا.
             </p>
             <input
               className="input mb-3"
@@ -341,33 +475,56 @@ const Employees = () => {
             ) : (
               <div className="max-h-[50vh] overflow-y-auto divide-y divide-sand-100 border border-sand-100 rounded-xl mb-3">
                 {filteredGroupStudents.map((s) => (
-                  <label key={s._id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-sand-50">
+                  <label
+                    key={s._id}
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-sand-50"
+                  >
                     <input
                       type="checkbox"
                       checked={groupSelected.has(s._id)}
                       onChange={() => toggleGroupStudent(s._id)}
                     />
                     <span className="flex-1">{s.name}</span>
-                    {s.teacher && (s.teacher._id || s.teacher) !== groupTeacher._id && (
-                      <span className="text-xs text-sand-400">مع: {s.teacher.name || "مدرس آخر"}</span>
-                    )}
+                    {s.teacher &&
+                      (s.teacher._id || s.teacher) !== groupTeacher._id && (
+                        <span className="text-xs text-sand-400">
+                          مع: {s.teacher.name || "مدرس آخر"}
+                        </span>
+                      )}
                   </label>
                 ))}
                 {filteredGroupStudents.length === 0 && (
-                  <p className="text-center text-sand-400 py-6">لا يوجد طلاب مطابقين</p>
+                  <p className="text-center text-sand-400 py-6">
+                    لا يوجد طلاب مطابقين
+                  </p>
                 )}
               </div>
             )}
-            <p className="text-xs text-sand-500 mb-3">تم اختيار {groupSelected.size} طالب</p>
-            {groupMsg && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-3">{groupMsg}</div>}
-            <button className="btn-primary w-full justify-center" onClick={saveTeacherGroup} disabled={groupSaving}>
+            <p className="text-xs text-sand-500 mb-3">
+              تم اختيار {groupSelected.size} طالب
+            </p>
+            {groupMsg && (
+              <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-3">
+                {groupMsg}
+              </div>
+            )}
+            <button
+              className="btn-primary w-full justify-center"
+              onClick={saveTeacherGroup}
+              disabled={groupSaving}
+            >
               {groupSaving ? "جارِ الحفظ..." : "حفظ المجموعة"}
             </button>
           </div>
         )}
       </Modal>
 
-      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} message="سيتم حذف المستخدم نهائيًا. هل أنت متأكد؟" />
+      <ConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        message="سيتم حذف المستخدم نهائيًا. هل أنت متأكد؟"
+      />
     </div>
   );
 };

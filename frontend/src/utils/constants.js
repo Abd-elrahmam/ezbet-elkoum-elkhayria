@@ -26,7 +26,7 @@ const ATTENDANCE_STATUS = {
 };
 
 // عدد أيام الشهر المعتمد في ملخصات الحضور الشهري وحساب مقدار الحفظ المتوقع (للطلاب)
-const MONTH_TOTAL_DAYS = 20;
+const MONTH_TOTAL_DAYS = 22;
 
 // عدد أيام الشهر المعتمد لملخص حضور الموظفين الشهري
 const EMPLOYEE_MONTH_TOTAL_DAYS = 22;
