@@ -178,7 +178,7 @@ const buildAnnualWhatsAppMessage = (report) => {
   lines.push(`السلام عليكم ${guardianName}`);
   lines.push(`ولي أمر الطالب: ${student?.name || ""}`);
   lines.push(
-    `هذا التقرير السنوي لسنة ${report.year} من إدارة ${deptLabel}${branchName ? ` - فرع ${branchName}` : ""}`,
+    `هذا ${report.rangeLabel || `التقرير السنوي لسنة ${report.year}`} من إدارة ${deptLabel}${branchName ? ` - فرع ${branchName}` : ""}`,
   );
   lines.push("");
   lines.push(`📅 عدد الشهور المسجلة: ${months.length}`);
@@ -196,6 +196,22 @@ const buildAnnualWhatsAppMessage = (report) => {
 };
 
 const currentYearNum = () => new Date().getFullYear();
+
+// توليد كل الشهور بين شهرين (شامل الطرفين)
+const buildMonthRange = (fromMonth, toMonth) => {
+  const months = [];
+  let [fy, fm] = fromMonth.split("-").map(Number);
+  const [ty, tm] = toMonth.split("-").map(Number);
+  while (fy < ty || (fy === ty && fm <= tm)) {
+    months.push(`${fy}-${String(fm).padStart(2, "0")}`);
+    fm++;
+    if (fm > 12) {
+      fm = 1;
+      fy++;
+    }
+  }
+  return months;
+};
 
 // جلب بيانات شهر واحد لطالب - نفس منطق التقرير الشهري، لكن كدالة قابلة لإعادة الاستخدام
 // (بتتنادى 12 مرة في التقرير السنوي، ومرة واحدة في التقرير الشهري)
@@ -371,6 +387,11 @@ const Reports = () => {
   const [month, setMonth] = useState(currentMonth());
   const [year, setYear] = useState(currentYearNum());
 
+  // وضع التقرير السنوي: تلقائي (سنة كاملة) أو مدى مخصص
+  const [annualRangeMode, setAnnualRangeMode] = useState("auto"); // auto | custom
+  const [fromMonth, setFromMonth] = useState(`${currentYearNum()}-01`);
+  const [toMonth, setToMonth] = useState(currentMonth());
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [report, setReport] = useState(null);
@@ -418,18 +439,43 @@ const Reports = () => {
     if (reportType !== "branch" && !selectedPerson) return;
     if (reportType === "branch" && !branchId) return;
     if (reportMode === "monthly" && !month) return;
-    if (reportMode === "annual" && !year) return;
+    if (reportMode === "annual" && annualRangeMode === "auto" && !year) return;
+    if (
+      reportMode === "annual" &&
+      annualRangeMode === "custom" &&
+      (!fromMonth || !toMonth)
+    )
+      return;
 
     setLoading(true);
     setError("");
     setReport(null);
     try {
       if (reportMode === "annual") {
-        // مانجيبش شهور مستقبلية لسه معملهاش
-        const relevantMonths = Array.from(
-          { length: 12 },
-          (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`,
-        ).filter((m) => m <= currentMonth());
+        // تحديد الشهور المطلوبة حسب اختيار المستخدم
+        let relevantMonths;
+        let rangeLabel;
+
+        if (annualRangeMode === "custom") {
+          if (fromMonth > toMonth) {
+            setError("شهر البداية لازم يكون قبل شهر النهاية");
+            setLoading(false);
+            return;
+          }
+          // توليد كل الشهور بين fromMonth و toMonth، واستبعاد الشهور المستقبلية
+          relevantMonths = buildMonthRange(fromMonth, toMonth).filter(
+            (m) => m <= currentMonth(),
+          );
+          rangeLabel = `من ${monthLabel(fromMonth)} إلى ${monthLabel(toMonth)}`;
+        } else {
+          // تلقائي: كل شهور السنة اللي فيها بيانات (بحد أقصى 12)
+          // مانجيبش شهور مستقبلية لسه معملهاش
+          relevantMonths = Array.from(
+            { length: 12 },
+            (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`,
+          ).filter((m) => m <= currentMonth());
+          rangeLabel = `التقرير السنوي لسنة ${year}`;
+        }
 
         if (reportType === "student") {
           const student = students.find((s) => s._id === selectedPerson);
@@ -443,6 +489,7 @@ const Reports = () => {
             type: "student",
             person: student,
             year,
+            rangeLabel,
             months: results.filter(studentMonthHasData),
           });
         } else if (reportType === "employee") {
@@ -457,6 +504,7 @@ const Reports = () => {
             type: "employee",
             person: employee,
             year,
+            rangeLabel,
             months: results.filter(employeeMonthHasData),
           });
         } else {
@@ -471,6 +519,7 @@ const Reports = () => {
             type: "branch",
             branch,
             year,
+            rangeLabel,
             months: results.filter(branchMonthHasData),
           });
         }
@@ -610,17 +659,68 @@ const Reports = () => {
                 />
               ) : (
                 <>
-                  <input
-                    className="input"
-                    type="number"
-                    value={year}
-                    onChange={(e) => setYear(Number(e.target.value))}
-                    placeholder="السنة"
-                  />
-                  <p className="text-xs text-sand-400 mt-1">
-                    هيتم عرض كل الشهور اللي فيها بيانات مسجلة في السنة دي
-                    تفصيليًا
-                  </p>
+                  {/* اختيار طريقة عرض السنة */}
+                  <div className="flex gap-2 bg-sand-100 rounded-xl p-1 mb-2 w-fit">
+                    <button
+                      type="button"
+                      className={`px-3 py-1 rounded-lg text-sm font-semibold transition ${
+                        annualRangeMode === "auto"
+                          ? "bg-white shadow-sm text-primary-700"
+                          : "text-sand-500"
+                      }`}
+                      onClick={() => setAnnualRangeMode("auto")}
+                    >
+                      سنة كاملة (تلقائي)
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1 rounded-lg text-sm font-semibold transition ${
+                        annualRangeMode === "custom"
+                          ? "bg-white shadow-sm text-primary-700"
+                          : "text-sand-500"
+                      }`}
+                      onClick={() => setAnnualRangeMode("custom")}
+                    >
+                      مدى مخصص
+                    </button>
+                  </div>
+
+                  {annualRangeMode === "auto" ? (
+                    <>
+                      <input
+                        className="input"
+                        type="number"
+                        value={year}
+                        onChange={(e) => setYear(Number(e.target.value))}
+                        placeholder="السنة"
+                      />
+                      <p className="text-xs text-sand-400 mt-1">
+                        هيتم عرض كل الشهور اللي فيها بيانات مسجلة في السنة دي
+                        تفصيليًا
+                      </p>
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-sand-500">من شهر</label>
+                        <input
+                          className="input"
+                          type="month"
+                          value={fromMonth}
+                          onChange={(e) => setFromMonth(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-sand-500">إلى شهر</label>
+                        <input
+                          className="input"
+                          type="month"
+                          value={toMonth}
+                          onChange={(e) => setToMonth(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -680,7 +780,11 @@ const Reports = () => {
             disabled={
               (reportType !== "branch" && !selectedPerson) ||
               loading ||
-              (reportMode === "monthly" ? !month : !year)
+              (reportMode === "monthly"
+                ? !month
+                : annualRangeMode === "auto"
+                  ? !year
+                  : !fromMonth || !toMonth)
             }
             onClick={generateReport}
           >
@@ -756,7 +860,8 @@ const Reports = () => {
                 </h2>
                 <p className="text-sand-500 text-sm">
                   {report.mode === "annual"
-                    ? `تقرير سنوي ${reportTitle} — سنة ${report.year}`
+                    ? report.rangeLabel ||
+                      `تقرير سنوي ${reportTitle} — سنة ${report.year}`
                     : `تقرير شهري ${reportTitle} — ${monthLabel(month)}`}
                 </p>
               </div>
@@ -1298,7 +1403,7 @@ const AnnualReportBody = ({ report }) => {
   const { type, months } = report;
 
   if (months.length === 0) {
-    return <EmptyNote text="لا توجد أي بيانات مسجلة في هذه السنة" />;
+    return <EmptyNote text="لا توجد أي بيانات مسجلة في المدى المحدد" />;
   }
 
   if (type === "student") {
@@ -1339,7 +1444,7 @@ const AnnualReportBody = ({ report }) => {
           </div>
         </div>
 
-        <ReportSection title={`ملخص السنة (${months.length} شهر مسجّل)`}>
+        <ReportSection title={`ملخص الفترة (${months.length} شهر مسجّل)`}>
           <div className="grid grid-cols-4 gap-3">
             <MiniStat
               label="إجمالي أيام الحضور"
@@ -1415,7 +1520,7 @@ const AnnualReportBody = ({ report }) => {
           </div>
         </div>
 
-        <ReportSection title={`ملخص السنة (${months.length} شهر مسجّل)`}>
+        <ReportSection title={`ملخص الفترة (${months.length} شهر مسجّل)`}>
           <div className="grid grid-cols-3 gap-3">
             <MiniStat
               label="إجمالي أيام الحضور"
@@ -1469,7 +1574,7 @@ const AnnualReportBody = ({ report }) => {
         <span className="font-bold text-lg">{report.branch?.name}</span>
       </div>
 
-      <ReportSection title={`ملخص السنة (${months.length} شهر مسجّل)`}>
+      <ReportSection title={`ملخص الفترة (${months.length} شهر مسجّل)`}>
         <div className="grid grid-cols-3 gap-3">
           <MiniStat
             label="إجمالي الإيرادات"
@@ -1482,7 +1587,7 @@ const AnnualReportBody = ({ report }) => {
             color="text-red-600"
           />
           <MiniStat
-            label="صافي السنة"
+            label="صافي الفترة"
             value={`${(totalIncome - totalExpenses).toLocaleString("ar-EG")} جنيه`}
             color="text-sand-700"
           />

@@ -3,7 +3,10 @@ const Hifz = require("../models/Hifz");
 const MonthlyAttendanceSummary = require("../models/MonthlyAttendanceSummary");
 const { protect, scopeToOwnBranch } = require("../middleware/auth");
 const { ROLES } = require("../utils/constants");
-const { computePagesRangeByName, findSurahByName } = require("../utils/quranPages");
+const {
+  computePagesRangeByName,
+  findSurahByName,
+} = require("../utils/quranPages");
 
 const router = express.Router();
 router.use(protect);
@@ -38,86 +41,161 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
 
     const results = await Promise.all(
       records.map(async (r) => {
-        // أيام الحضور: من الطلب، أو تُسحب من ملخص الحضور الشهري (لو الشهر بصيغة YYYY-MM)
+        // ============ أيام الحضور ============
         let presentDays = r.presentDays != null ? Number(r.presentDays) : null;
         if (presentDays == null && r.student && r.month) {
           const [y, m] = String(r.month).split("-").map(Number);
           if (y && m) {
-            const summary = await MonthlyAttendanceSummary.findOne({ student: r.student, month: m, year: y });
+            const summary = await MonthlyAttendanceSummary.findOne({
+              student: r.student,
+              month: m,
+              year: y,
+            });
             presentDays = summary ? summary.presentDays : null;
           }
         }
 
         const status = r.status || "normal";
-        const dailyRatePages = r.dailyRatePages != null ? Number(r.dailyRatePages) : null;
+
+        // ============ الحفظ - الفترة الأولى ============
+        const dailyRatePages =
+          r.dailyRatePages != null ? Number(r.dailyRatePages) : null;
         const expectedPages1 =
           status !== "normal"
             ? 0
             : dailyRatePages == null || presentDays == null
-            ? null
-            : Math.round(dailyRatePages * presentDays * 100) / 100;
+              ? null
+              : Math.round(dailyRatePages * presentDays * 100) / 100;
 
-        const memCalc1 = status === "normal"
-          ? computePagesRangeByName(r.memFromSurah, r.memFromAyah, r.memToSurah, r.memToAyah)
-          : { pagesCount: 0 };
+        const memTimes1 = Math.max(1, Number(r.memTimes1) || 1);
+        const memCalc1raw =
+          status === "normal"
+            ? computePagesRangeByName(
+                r.memFromSurah,
+                r.memFromAyah,
+                r.memToSurah,
+                r.memToAyah,
+              )
+            : { pagesCount: 0 };
 
-        // الفترة الثانية للحفظ (اختيارية) - نفس منطق الفترة الأولى بمعدل ونطاق منفصلين
+        const memUnique1 = memCalc1raw.pagesCount || 0; // في المره الواحده
+        const memPages1 = memUnique1 * memTimes1; // شاملة التكرار
+
+        // ============ الحفظ - الفترة الثانية (اختيارية) ============
         const hasPeriod2 = status === "normal" && !!r.hasPeriod2;
-        const dailyRatePages2 = hasPeriod2 && r.dailyRatePages2 != null ? Number(r.dailyRatePages2) : null;
-        const expectedPages2 =
-          !hasPeriod2
-            ? 0
-            : dailyRatePages2 == null || presentDays == null
+        const dailyRatePages2 =
+          hasPeriod2 && r.dailyRatePages2 != null
+            ? Number(r.dailyRatePages2)
+            : null;
+        const expectedPages2 = !hasPeriod2
+          ? 0
+          : dailyRatePages2 == null || presentDays == null
             ? null
             : Math.round(dailyRatePages2 * presentDays * 100) / 100;
-        const memCalc2 = hasPeriod2
-          ? computePagesRangeByName(r.memFromSurah2, r.memFromAyah2, r.memToSurah2, r.memToAyah2)
+
+        const memTimes2 = Math.max(1, Number(r.memTimes2) || 1);
+        const memCalc2raw = hasPeriod2
+          ? computePagesRangeByName(
+              r.memFromSurah2,
+              r.memFromAyah2,
+              r.memToSurah2,
+              r.memToAyah2,
+            )
           : { pagesCount: 0 };
 
+        const memUnique2 = memCalc2raw.pagesCount || 0;
+        const memPages2 = memUnique2 * memTimes2;
+
+        // ============ إجماليات الحفظ ============
         const expectedPages =
           expectedPages1 == null && expectedPages2 == null
             ? null
             : (expectedPages1 || 0) + (expectedPages2 || 0);
-        const totalMemPages = (memCalc1.pagesCount || 0) + (memCalc2.pagesCount || 0);
 
-        // المراجعة بتتحسب بالسورة كاملة (من أول آية في "من سورة" لحد آخر آية في "إلى سورة")
-        // مش بآية محددة، لأن المراجعة غالبًا بتكون بالسور/الأجزاء مش بجزء من آية
+        const totalMemUnique = memUnique1 + memUnique2;
+        const totalMemPages = memPages1 + memPages2;
+
+        // نسبة الحفظ (على الفي المره الواحده + cap 150%)
+        const rawMemPct =
+          expectedPages && expectedPages > 0
+            ? Math.round((totalMemUnique / expectedPages) * 100)
+            : null;
+        const memPct = rawMemPct != null ? Math.min(rawMemPct, 150) : null;
+
+        // ============ المراجعة - الفترة الأولى ============
         const revFromSurahObj = findSurahByName(r.revFromSurah);
         const revToSurahObj = findSurahByName(r.revToSurah);
         const revFromAyah = revFromSurahObj ? 1 : null;
         const revToAyah = revToSurahObj ? revToSurahObj.ayahCount : null;
-        const revCalc1 = computePagesRangeByName(r.revFromSurah, revFromAyah, r.revToSurah, revToAyah);
 
-        const revDailyRatePages = r.revDailyRatePages != null ? Number(r.revDailyRatePages) : null;
+        const revTimes1 = Math.max(1, Number(r.revTimes1) || 1);
+        const revCalc1raw = computePagesRangeByName(
+          r.revFromSurah,
+          revFromAyah,
+          r.revToSurah,
+          revToAyah,
+        );
+
+        const revUnique1 = revCalc1raw.pagesCount || 0;
+        const revPages1 = revUnique1 * revTimes1;
+
+        const revDailyRatePages =
+          r.revDailyRatePages != null ? Number(r.revDailyRatePages) : null;
         const expectedRevisionPages1 =
           revDailyRatePages == null || presentDays == null
             ? null
             : Math.round(revDailyRatePages * presentDays * 100) / 100;
 
-        // الفترة الثانية للمراجعة (اختيارية)
+        // ============ المراجعة - الفترة الثانية (اختيارية) ============
         const hasRevPeriod2 = !!r.hasRevPeriod2;
         const revFromSurahObj2 = findSurahByName(r.revFromSurah2);
         const revToSurahObj2 = findSurahByName(r.revToSurah2);
         const revFromAyah2 = revFromSurahObj2 ? 1 : null;
         const revToAyah2 = revToSurahObj2 ? revToSurahObj2.ayahCount : null;
-        const revCalc2 = hasRevPeriod2
-          ? computePagesRangeByName(r.revFromSurah2, revFromAyah2, r.revToSurah2, revToAyah2)
+
+        const revTimes2 = Math.max(1, Number(r.revTimes2) || 1);
+        const revCalc2raw = hasRevPeriod2
+          ? computePagesRangeByName(
+              r.revFromSurah2,
+              revFromAyah2,
+              r.revToSurah2,
+              revToAyah2,
+            )
           : { pagesCount: 0 };
-        const revDailyRatePages2 = hasRevPeriod2 && r.revDailyRatePages2 != null ? Number(r.revDailyRatePages2) : null;
-        const expectedRevisionPages2 =
-          !hasRevPeriod2
-            ? 0
-            : revDailyRatePages2 == null || presentDays == null
+
+        const revUnique2 = revCalc2raw.pagesCount || 0;
+        const revPages2 = revUnique2 * revTimes2;
+
+        const revDailyRatePages2 =
+          hasRevPeriod2 && r.revDailyRatePages2 != null
+            ? Number(r.revDailyRatePages2)
+            : null;
+        const expectedRevisionPages2 = !hasRevPeriod2
+          ? 0
+          : revDailyRatePages2 == null || presentDays == null
             ? null
             : Math.round(revDailyRatePages2 * presentDays * 100) / 100;
 
+        // ============ إجماليات المراجعة ============
         const expectedRevisionPages =
           expectedRevisionPages1 == null && expectedRevisionPages2 == null
             ? null
             : (expectedRevisionPages1 || 0) + (expectedRevisionPages2 || 0);
-        const totalRevisionPages = (revCalc1.pagesCount || 0) + (revCalc2.pagesCount || 0);
 
-        const query = r.student ? { student: r.student, month: r.month } : { employee: r.employee, month: r.month };
+        const totalRevUnique = revUnique1 + revUnique2;
+        const totalRevisionPages = revPages1 + revPages2;
+
+        // نسبة المراجعة (على الفي المره الواحده + cap 150%)
+        const rawRevPct =
+          expectedRevisionPages && expectedRevisionPages > 0
+            ? Math.round((totalRevUnique / expectedRevisionPages) * 100)
+            : null;
+        const revPct = rawRevPct != null ? Math.min(rawRevPct, 150) : null;
+
+        // ============ الحفظ في الداتابيز ============
+        const query = r.student
+          ? { student: r.student, month: r.month }
+          : { employee: r.employee, month: r.month };
 
         return Hifz.findOneAndUpdate(
           query,
@@ -137,7 +215,9 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
             memFromAyah: status === "normal" ? r.memFromAyah || null : null,
             memToSurah: status === "normal" ? r.memToSurah || "" : "",
             memToAyah: status === "normal" ? r.memToAyah || null : null,
-            memPages1: memCalc1.pagesCount || 0,
+            memTimes1,
+            memUnique1,
+            memPages1,
             hasPeriod2,
             period2Label: hasPeriod2 ? r.period2Label || "" : "",
             dailyRatePages2,
@@ -146,16 +226,22 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
             memFromAyah2: hasPeriod2 ? r.memFromAyah2 || null : null,
             memToSurah2: hasPeriod2 ? r.memToSurah2 || "" : "",
             memToAyah2: hasPeriod2 ? r.memToAyah2 || null : null,
-            memPages2: memCalc2.pagesCount || 0,
+            memTimes2: hasPeriod2 ? memTimes2 : 1,
+            memUnique2,
+            memPages2,
+            totalMemUnique,
             totalMemPages,
+            memPct,
             revPeriod1Label: r.revPeriod1Label || "",
             revFromSurah: r.revFromSurah || "",
             revFromAyah,
             revToSurah: r.revToSurah || "",
             revToAyah,
             revDailyRatePages,
+            revTimes1,
             expectedRevisionPages,
-            revPages1: revCalc1.pagesCount || 0,
+            revUnique1,
+            revPages1,
             hasRevPeriod2,
             revPeriod2Label: hasRevPeriod2 ? r.revPeriod2Label || "" : "",
             revDailyRatePages2,
@@ -163,21 +249,27 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
             revFromSurah2: hasRevPeriod2 ? r.revFromSurah2 || "" : "",
             revFromAyah2,
             revToSurah2: hasRevPeriod2 ? r.revToSurah2 || "" : "",
-            revPages2: revCalc2.pagesCount || 0,
+            revTimes2: hasRevPeriod2 ? revTimes2 : 1,
+            revUnique2,
+            revPages2,
+            totalRevUnique,
             totalRevisionPages,
+            revPct,
             revGrade: r.revGrade || null,
             mutoonFrom: r.mutoonFrom || "",
             mutoonTo: r.mutoonTo || "",
             grade: r.grade || null,
             notes: r.notes || "",
           },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
+          { upsert: true, new: true, setDefaultsOnInsert: true },
         );
-      })
+      }),
     );
     res.status(201).json(results);
   } catch (err) {
-    res.status(400).json({ message: "فشل حفظ سجلات الحفظ", error: err.message });
+    res
+      .status(400)
+      .json({ message: "فشل حفظ سجلات الحفظ", error: err.message });
   }
 });
 

@@ -9,8 +9,8 @@ import { useDepartmentAccess } from "../hooks/useDepartmentAccess";
 import Modal from "../components/Modal";
 
 const STATUS_OPTIONS = [
-  { value: "normal", label: "عادي" },
-  { value: "khatm", label: "🌟 ختم القرآن" },
+  { value: "normal", label: "حفظ ومراجعة" },
+  // { value: "khatm", label: "🌟 ختم القرآن" },
   { value: "review_only", label: "مراجعة فقط" },
 ];
 
@@ -31,7 +31,7 @@ const emptyDraft = () => ({
   memFromAyah: "",
   memToSurah: "",
   memToAyah: "",
-  // فترة حفظ تانية (اختيارية) - مثلاً فترة مسائية بمعدل ونطاق مختلف عن الفترة الأولى
+  memTimes1: 1,
   hasPeriod2: false,
   period2Label: "",
   dailyRatePages2: 0.5,
@@ -39,22 +39,24 @@ const emptyDraft = () => ({
   memFromAyah2: "",
   memToSurah2: "",
   memToAyah2: "",
+  memTimes2: 1,
   revPeriod1Label: "",
   revFromSurah: "",
   revToSurah: "",
   revDailyRatePages: 0.5,
-  // فترة مراجعة تانية (اختيارية) - نفس فكرة فترة الحفظ التانية
+  revTimes1: 1,
   hasRevPeriod2: false,
   revPeriod2Label: "",
   revFromSurah2: "",
   revToSurah2: "",
   revDailyRatePages2: 0.5,
+  revTimes2: 1,
   revGrade: "",
   revGradeMode: "auto",
   mutoonFrom: "",
   mutoonTo: "",
   grade: "",
-  gradeMode: "auto", // auto = التقدير بيتحسب لوحده من النسبة | manual = المستخدم اختاره بنفسه
+  gradeMode: "auto",
   notes: "",
 });
 
@@ -64,8 +66,6 @@ const surahNumberByName = (name) => {
   return s ? s.number : "";
 };
 
-// ثابتة برّه الكومبوننت الأساسية عشان مرجعها ميتغيرش كل ريندر
-// (لو اتعرّفت جوه الكومبوننت، React بيعتبرها نوع مختلف كل مرة وبيفصل التركيز من الإنبوت)
 const SurahAyahPicker = ({ label, surahValue, ayahValue, onSurah, onAyah }) => (
   <div className="grid grid-cols-2 gap-2">
     <div>
@@ -96,8 +96,6 @@ const SurahAyahPicker = ({ label, surahValue, ayahValue, onSurah, onAyah }) => (
   </div>
 );
 
-// نفس الفكرة لكن للمراجعة: من سورة - إلى سورة بس، بدون آية
-// (المراجعة بتتحسب بالسورة كاملة مش بجزء من آية)
 const SurahOnlyPicker = ({ label, surahValue, onSurah }) => (
   <div>
     <label className="label">{label} - سورة</label>
@@ -130,8 +128,8 @@ const Memorization = () => {
   const [sortMode, setSortMode] = useState("name");
 
   const [students, setStudents] = useState([]);
-  const [attendanceMap, setAttendanceMap] = useState({}); // studentId -> presentDays
-  const [records, setRecords] = useState({}); // studentId -> draft fields
+  const [attendanceMap, setAttendanceMap] = useState({});
+  const [records, setRecords] = useState({});
 
   const [month, setMonth] = useState(activeMonth);
   const [year, setYear] = useState(activeYear);
@@ -168,7 +166,6 @@ const Memorization = () => {
     api.get("/students", { params }).then((res) => setStudents(res.data));
   }, [department, filterBranch, sortMode]);
 
-  // سحب أيام الحضور من الملخص الشهري لنفس الشهر/السنة
   useEffect(() => {
     const params = { department, month, year };
     if (filterBranch) params.branch = filterBranch;
@@ -181,7 +178,6 @@ const Memorization = () => {
     });
   }, [department, month, year, filterBranch]);
 
-  // سحب سجلات الحفظ المحفوظة سابقًا لنفس الشهر
   const loadHifz = () => {
     const params = { department, month: monthStr };
     if (filterBranch) params.branch = filterBranch;
@@ -198,6 +194,7 @@ const Memorization = () => {
           memFromAyah: r.memFromAyah || "",
           memToSurah: surahNumberByName(r.memToSurah),
           memToAyah: r.memToAyah || "",
+          memTimes1: r.memTimes1 || 1,
           hasPeriod2: !!r.hasPeriod2,
           period2Label: r.period2Label || "",
           dailyRatePages2: r.dailyRatePages2 ?? 0.5,
@@ -205,15 +202,18 @@ const Memorization = () => {
           memFromAyah2: r.memFromAyah2 || "",
           memToSurah2: surahNumberByName(r.memToSurah2),
           memToAyah2: r.memToAyah2 || "",
+          memTimes2: r.memTimes2 || 1,
           revPeriod1Label: r.revPeriod1Label || "",
           revFromSurah: surahNumberByName(r.revFromSurah),
           revToSurah: surahNumberByName(r.revToSurah),
           revDailyRatePages: r.revDailyRatePages ?? 0.5,
+          revTimes1: r.revTimes1 || 1,
           hasRevPeriod2: !!r.hasRevPeriod2,
           revPeriod2Label: r.revPeriod2Label || "",
           revFromSurah2: surahNumberByName(r.revFromSurah2),
           revToSurah2: surahNumberByName(r.revToSurah2),
           revDailyRatePages2: r.revDailyRatePages2 ?? 0.5,
+          revTimes2: r.revTimes2 || 1,
           revGrade: r.revGrade || "",
           revGradeMode: r.revGrade ? "manual" : "auto",
           mutoonFrom: r.mutoonFrom || "",
@@ -236,10 +236,9 @@ const Memorization = () => {
 
   const openStudent = (student) => {
     const presentDays = attendanceMap[student._id];
-    // مينفعش يسجل حفظ لطالب مش متاخدله غياب الشهر ده، لأن المتوقع (المعدل × أيام الحضور) هيبقى غلط
     if (presentDays == null) {
       setAttendanceWarning(
-        `الرجاء تسجيل حضور "${student.name}" في شهر ${MONTH_NAMES[month - 1]} ${year} أولا من صفحة "الحضور والغياب".`,
+        `⚠️ لازم تسجّل حضور "${student.name}" في شهر ${MONTH_NAMES[month - 1]} ${year} الأول من صفحة "الحضور والغياب"، وبعدين ترجع تسجّل حفظه.`,
       );
       return;
     }
@@ -252,7 +251,6 @@ const Memorization = () => {
   const updateDraft = (field, value) =>
     setDraft((prev) => ({ ...prev, [field]: value }));
 
-  // لو حدد "ختم القرآن" أو "مراجعة فقط"، مفيش داعي لبيانات حفظ جديد - نفضّيها
   const updateStatus = (status) => {
     setDraft((prev) => ({
       ...prev,
@@ -263,15 +261,24 @@ const Memorization = () => {
     }));
   };
 
+  // ============================================================
+  // الحساب الرئيسي (معدّل):
+  // - memUnique = الصفحات الفي المره الواحده (بدون تكرار)
+  // - memPages  = الصفحات شاملة التكرار
+  // - النسبة (pct) بتتحسب على الفي المره الواحده + cap عند 150%
+  // ============================================================
   const draftCalc = useMemo(() => {
     const presentDays = activeStudent ? attendanceMap[activeStudent._id] : null;
     const isNormal = draft.status === "normal";
+    const days = presentDays || 0;
 
-    // الحفظ - الفترة الأولى
+    // ============ الحفظ - الفترة الأولى ============
     const dailyRate1 = Number(draft.dailyRatePages) || 0;
     const expectedPages1 = isNormal
-      ? Math.round(dailyRate1 * (presentDays || 0) * 100) / 100
+      ? Math.round(dailyRate1 * days * 100) / 100
       : 0;
+
+    let memUnique1 = 0;
     let memPages1 = 0;
     if (
       isNormal &&
@@ -280,20 +287,24 @@ const Memorization = () => {
       draft.memToSurah &&
       draft.memToAyah
     ) {
-      memPages1 = computePagesRange(
+      memUnique1 = computePagesRange(
         draft.memFromSurah,
         draft.memFromAyah,
         draft.memToSurah,
         draft.memToAyah,
       ).pagesCount;
+      const times1 = Math.max(1, Number(draft.memTimes1) || 1);
+      memPages1 = memUnique1 * times1;
     }
 
-    // الحفظ - الفترة الثانية (لو مفعّلة)
+    // ============ الحفظ - الفترة الثانية ============
     const dailyRate2 = Number(draft.dailyRatePages2) || 0;
     const expectedPages2 =
       isNormal && draft.hasPeriod2
-        ? Math.round(dailyRate2 * (presentDays || 0) * 100) / 100
+        ? Math.round(dailyRate2 * days * 100) / 100
         : 0;
+
+    let memUnique2 = 0;
     let memPages2 = 0;
     if (
       isNormal &&
@@ -303,84 +314,108 @@ const Memorization = () => {
       draft.memToSurah2 &&
       draft.memToAyah2
     ) {
-      memPages2 = computePagesRange(
+      memUnique2 = computePagesRange(
         draft.memFromSurah2,
         draft.memFromAyah2,
         draft.memToSurah2,
         draft.memToAyah2,
       ).pagesCount;
+      const times2 = Math.max(1, Number(draft.memTimes2) || 1);
+      memPages2 = memUnique2 * times2;
     }
 
     const expectedPages = expectedPages1 + expectedPages2;
+    const memUnique = memUnique1 + memUnique2;
     const memPages = memPages1 + memPages2;
-    const pct =
-      expectedPages > 0 ? Math.round((memPages / expectedPages) * 100) : null;
 
-    // المراجعة - الفترة الأولى
+    // النسبة على الفي المره الواحده + cap 150%
+    const rawPct =
+      expectedPages > 0 ? Math.round((memUnique / expectedPages) * 100) : null;
+    const pct = rawPct != null ? Math.min(rawPct, 150) : null;
+
+    // ============ المراجعة - الفترة الأولى ============
+    let revUnique1 = 0;
     let revPages1 = 0;
     if (draft.revFromSurah && draft.revToSurah) {
       const toSurahInfo = SURAHS.find(
         (sr) => sr.number === Number(draft.revToSurah),
       );
       const lastAyah = toSurahInfo ? toSurahInfo.ayahCount : 1;
-      revPages1 = computePagesRange(
+      revUnique1 = computePagesRange(
         draft.revFromSurah,
         1,
         draft.revToSurah,
         lastAyah,
       ).pagesCount;
+      const revTimes1 = Math.max(1, Number(draft.revTimes1) || 1);
+      revPages1 = revUnique1 * revTimes1;
     }
     const revDailyRate1 = Number(draft.revDailyRatePages) || 0;
-    const expectedRevisionPages1 =
-      Math.round(revDailyRate1 * (presentDays || 0) * 100) / 100;
+    const expectedRevisionPages1 = Math.round(revDailyRate1 * days * 100) / 100;
 
-    // المراجعة - الفترة الثانية (لو مفعّلة)
+    // ============ المراجعة - الفترة الثانية ============
+    let revUnique2 = 0;
     let revPages2 = 0;
     if (draft.hasRevPeriod2 && draft.revFromSurah2 && draft.revToSurah2) {
       const toSurahInfo2 = SURAHS.find(
         (sr) => sr.number === Number(draft.revToSurah2),
       );
       const lastAyah2 = toSurahInfo2 ? toSurahInfo2.ayahCount : 1;
-      revPages2 = computePagesRange(
+      revUnique2 = computePagesRange(
         draft.revFromSurah2,
         1,
         draft.revToSurah2,
         lastAyah2,
       ).pagesCount;
+      const revTimes2 = Math.max(1, Number(draft.revTimes2) || 1);
+      revPages2 = revUnique2 * revTimes2;
     }
     const revDailyRate2 = Number(draft.revDailyRatePages2) || 0;
     const expectedRevisionPages2 = draft.hasRevPeriod2
-      ? Math.round(revDailyRate2 * (presentDays || 0) * 100) / 100
+      ? Math.round(revDailyRate2 * days * 100) / 100
       : 0;
 
     const expectedRevisionPages =
       expectedRevisionPages1 + expectedRevisionPages2;
+    const revUnique = revUnique1 + revUnique2;
     const revPages = revPages1 + revPages2;
-    const revPct =
+
+    const rawRevPct =
       expectedRevisionPages > 0
-        ? Math.round((revPages / expectedRevisionPages) * 100)
+        ? Math.round((revUnique / expectedRevisionPages) * 100)
         : null;
+    const revPct = rawRevPct != null ? Math.min(rawRevPct, 150) : null;
 
     return {
       presentDays,
+      // الحفظ
       expectedPages,
       memPages,
+      memUnique,
       pct,
+      rawPct,
       expectedPages1,
       memPages1,
+      memUnique1,
       expectedPages2,
       memPages2,
+      memUnique2,
+      // المراجعة
       expectedRevisionPages,
       revPages,
+      revUnique,
       revPct,
+      rawRevPct,
       expectedRevisionPages1,
       revPages1,
+      revUnique1,
       expectedRevisionPages2,
       revPages2,
+      revUnique2,
     };
   }, [draft, activeStudent, attendanceMap]);
 
-  // تحديث تقدير الحفظ تلقائيًا من نسبة الحفظ، إلا لو المستخدم اختار تقدير بنفسه
+  // تحديث تقدير الحفظ تلقائيًا من نسبة الحفظ (على الفي المره الواحده)
   useEffect(() => {
     if (draft.gradeMode !== "auto") return;
     if (draft.status !== "normal" || draftCalc.pct == null) return;
@@ -390,7 +425,7 @@ const Memorization = () => {
     }
   }, [draftCalc.pct, draft.gradeMode, draft.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // تحديث تقدير المراجعة تلقائيًا من نسبة المراجعة (منفصل تمامًا عن تقييم الحفظ)
+  // تحديث تقدير المراجعة تلقائيًا (على الفي المره الواحده)
   useEffect(() => {
     if (draft.revGradeMode !== "auto") return;
     if (draftCalc.revPct == null) return;
@@ -442,6 +477,7 @@ const Memorization = () => {
           memFromAyah: draft.memFromAyah || null,
           memToSurah: surahNameByNumber(draft.memToSurah),
           memToAyah: draft.memToAyah || null,
+          memTimes1: Number(draft.memTimes1) || 1,
           hasPeriod2: !!draft.hasPeriod2,
           period2Label: draft.period2Label || "",
           dailyRatePages2: Number(draft.dailyRatePages2) || 0,
@@ -449,15 +485,18 @@ const Memorization = () => {
           memFromAyah2: draft.memFromAyah2 || null,
           memToSurah2: surahNameByNumber(draft.memToSurah2),
           memToAyah2: draft.memToAyah2 || null,
+          memTimes2: Number(draft.memTimes2) || 1,
           revPeriod1Label: draft.revPeriod1Label || "",
           revFromSurah: surahNameByNumber(draft.revFromSurah),
           revToSurah: surahNameByNumber(draft.revToSurah),
           revDailyRatePages: Number(draft.revDailyRatePages) || 0,
+          revTimes1: Number(draft.revTimes1) || 1,
           hasRevPeriod2: !!draft.hasRevPeriod2,
           revPeriod2Label: draft.revPeriod2Label || "",
           revFromSurah2: surahNameByNumber(draft.revFromSurah2),
           revToSurah2: surahNameByNumber(draft.revToSurah2),
           revDailyRatePages2: Number(draft.revDailyRatePages2) || 0,
+          revTimes2: Number(draft.revTimes2) || 1,
           revGrade: draft.revGrade || null,
           mutoonFrom: draft.mutoonFrom || "",
           mutoonTo: draft.mutoonTo || "",
@@ -467,7 +506,7 @@ const Memorization = () => {
       ];
       await api.post("/hifz/bulk", { records: payload });
       setRecords((prev) => ({ ...prev, [activeStudent._id]: draft }));
-      setSaveMsg("تم الحفظ بنجاح ");
+      setSaveMsg("تم الحفظ بنجاح ✅");
       setTimeout(() => setActiveStudent(null), 700);
     } catch (err) {
       setSaveMsg(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
@@ -724,9 +763,36 @@ const Memorization = () => {
                       onAyah={(v) => updateDraft("memToAyah", v)}
                     />
                   </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="label whitespace-nowrap mb-0">
+                      عدد المرات
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      className="input w-20"
+                      value={draft.memTimes1}
+                      onChange={(e) =>
+                        updateDraft(
+                          "memTimes1",
+                          Math.max(1, Number(e.target.value) || 1),
+                        )
+                      }
+                    />
+                    <span className="text-xs text-sand-400">
+                      (لو حفظ نفس النطاق أكتر من مرة)
+                    </span>
+                  </div>
                   <div className="input bg-white flex items-center justify-between">
                     <span>
                       المحفوظ فعليًا: {formatPagesOrJuz(draftCalc.memPages1)}
+                      {draftCalc.memUnique1 !== draftCalc.memPages1 && (
+                        <span className="text-xs text-sand-400 mr-2">
+                          (في المره الواحده:{" "}
+                          {formatPagesOrJuz(draftCalc.memUnique1)})
+                        </span>
+                      )}
                       {draftCalc.expectedPages1 > 0
                         ? ` من ${formatPagesOrJuz(draftCalc.expectedPages1)} متوقعة`
                         : ""}
@@ -805,9 +871,36 @@ const Memorization = () => {
                         onAyah={(v) => updateDraft("memToAyah2", v)}
                       />
                     </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="label whitespace-nowrap mb-0">
+                        عدد المرات
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className="input w-20"
+                        value={draft.memTimes2}
+                        onChange={(e) =>
+                          updateDraft(
+                            "memTimes2",
+                            Math.max(1, Number(e.target.value) || 1),
+                          )
+                        }
+                      />
+                      <span className="text-xs text-sand-400">
+                        (لو حفظ نفس النطاق أكتر من مرة)
+                      </span>
+                    </div>
                     <div className="input bg-white flex items-center justify-between">
                       <span>
                         المحفوظ فعليًا: {formatPagesOrJuz(draftCalc.memPages2)}
+                        {draftCalc.memUnique2 !== draftCalc.memPages2 && (
+                          <span className="text-xs text-sand-400 mr-2">
+                            (في المره الواحده:{" "}
+                            {formatPagesOrJuz(draftCalc.memUnique2)})
+                          </span>
+                        )}
                         {draftCalc.expectedPages2 > 0
                           ? ` من ${formatPagesOrJuz(draftCalc.expectedPages2)} متوقعة`
                           : ""}
@@ -816,10 +909,16 @@ const Memorization = () => {
                   </div>
                 )}
 
-                {/* إجمالي الحفظ - جمع الفترتين */}
+                {/* إجمالي الحفظ */}
                 <div className="input bg-primary-50 border border-primary-200 flex items-center justify-between mb-4">
                   <span className="font-semibold text-primary-800">
                     إجمالي الحفظ: {formatPagesOrJuz(draftCalc.memPages)}
+                    {draftCalc.memUnique !== draftCalc.memPages && (
+                      <span className="text-xs text-primary-600 mr-2">
+                        (في المره الواحده:{" "}
+                        {formatPagesOrJuz(draftCalc.memUnique)})
+                      </span>
+                    )}
                     {draftCalc.expectedPages > 0
                       ? ` من ${formatPagesOrJuz(draftCalc.expectedPages)} متوقعة`
                       : ""}
@@ -893,9 +992,37 @@ const Memorization = () => {
                   onSurah={(v) => updateDraft("revToSurah", v)}
                 />
               </div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="label whitespace-nowrap mb-0">
+                  عدد مرات المراجعة
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="input w-20"
+                  value={draft.revTimes1}
+                  onChange={(e) =>
+                    updateDraft(
+                      "revTimes1",
+                      Math.max(1, Number(e.target.value) || 1),
+                    )
+                  }
+                />
+                <span className="text-xs text-sand-400">
+                  ( إذا راجع النطاق نفسه أكثر من مرة، مثل مراجعة سورة البقرة
+                  مرتين)
+                </span>
+              </div>
               <div className="input bg-white flex items-center justify-between">
                 <span>
                   راجع فعليًا: {formatPagesOrJuz(draftCalc.revPages1)}
+                  {draftCalc.revUnique1 !== draftCalc.revPages1 && (
+                    <span className="text-xs text-sand-400 mr-2">
+                      (في المره الواحده:{" "}
+                      {formatPagesOrJuz(draftCalc.revUnique1)})
+                    </span>
+                  )}
                   {draftCalc.expectedRevisionPages1 > 0
                     ? ` من ${formatPagesOrJuz(draftCalc.expectedRevisionPages1)} متوقعة`
                     : ""}
@@ -968,9 +1095,36 @@ const Memorization = () => {
                     onSurah={(v) => updateDraft("revToSurah2", v)}
                   />
                 </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="label whitespace-nowrap mb-0">
+                    عدد مرات المراجعة
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    className="input w-20"
+                    value={draft.revTimes2}
+                    onChange={(e) =>
+                      updateDraft(
+                        "revTimes2",
+                        Math.max(1, Number(e.target.value) || 1),
+                      )
+                    }
+                  />
+                  <span className="text-xs text-sand-400">
+                    (لو راجع نفس النطاق أكتر من مرة)
+                  </span>
+                </div>
                 <div className="input bg-white flex items-center justify-between">
                   <span>
                     راجع فعليًا: {formatPagesOrJuz(draftCalc.revPages2)}
+                    {draftCalc.revUnique2 !== draftCalc.revPages2 && (
+                      <span className="text-xs text-sand-400 mr-2">
+                        (في المره الواحده:{" "}
+                        {formatPagesOrJuz(draftCalc.revUnique2)})
+                      </span>
+                    )}
                     {draftCalc.expectedRevisionPages2 > 0
                       ? ` من ${formatPagesOrJuz(draftCalc.expectedRevisionPages2)} متوقعة`
                       : ""}
@@ -979,10 +1133,15 @@ const Memorization = () => {
               </div>
             )}
 
-            {/* إجمالي المراجعة - جمع الفترتين */}
+            {/* إجمالي المراجعة */}
             <div className="input bg-sky-50 border border-sky-200 flex items-center justify-between mb-4">
               <span className="font-semibold text-sky-800">
                 إجمالي المراجعة: {formatPagesOrJuz(draftCalc.revPages)}
+                {draftCalc.revUnique !== draftCalc.revPages && (
+                  <span className="text-xs text-sky-600 mr-2">
+                    (في المره الواحده: {formatPagesOrJuz(draftCalc.revUnique)})
+                  </span>
+                )}
                 {draftCalc.expectedRevisionPages > 0
                   ? ` من ${formatPagesOrJuz(draftCalc.expectedRevisionPages)} متوقعة`
                   : ""}
@@ -1033,7 +1192,7 @@ const Memorization = () => {
                       onClick={resetGradeToAuto}
                       className="text-xs text-primary-600 hover:underline"
                     >
-                      تلقائي
+                      🔄 تلقائي
                     </button>
                   )}
                 </div>
@@ -1065,7 +1224,7 @@ const Memorization = () => {
                         onClick={resetRevGradeToAuto}
                         className="text-xs text-primary-600 hover:underline"
                       >
-                        تلقائي
+                        🔄 تلقائي
                       </button>
                     )}
                 </div>

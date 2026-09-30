@@ -40,6 +40,8 @@ router.post("/", scopeToOwnBranch, async (req, res) => {
 });
 
 // تسجيل حضور جماعي (كشف فصل كامل في مرة واحدة)
+// بيستخدم upsert (تحديث لو موجود / إنشاء لو مش موجود) عشان لو المستخدم دوس "حفظ" أكتر من مرة
+// لنفس اليوم، ما يتكررش السجل ويبوّظ حساب الحضور الشهري
 router.post("/bulk", scopeToOwnBranch, async (req, res) => {
   try {
     const { records } = req.body; // مصفوفة من سجلات الحضور
@@ -47,9 +49,21 @@ router.post("/bulk", scopeToOwnBranch, async (req, res) => {
       return res.status(400).json({ message: "لا توجد سجلات لحفظها" });
     }
     const branch = req.user.role === ROLES.SUPER_ADMIN ? null : req.user.branch;
-    const docs = records.map((r) => ({ ...r, branch: branch || r.branch }));
-    const created = await Attendance.insertMany(docs);
-    res.status(201).json(created);
+
+    const results = await Promise.all(
+      records.map((r) => {
+        const doc = { ...r, branch: branch || r.branch };
+        const query = doc.student
+          ? { student: doc.student, department: doc.department, date: doc.date }
+          : { employee: doc.employee, department: doc.department, date: doc.date };
+        return Attendance.findOneAndUpdate(query, doc, {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
+        });
+      })
+    );
+    res.status(201).json(results);
   } catch (err) {
     res.status(400).json({ message: "فشل تسجيل الحضور الجماعي", error: err.message });
   }

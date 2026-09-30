@@ -3,7 +3,7 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { usePeriod, MONTH_NAMES } from "../context/PeriodContext";
 
-const MONTH_TOTAL_DAYS = 22; // شهر الموظفين 22 يوم عمل (بدل 20 للطلاب)
+const MONTH_TOTAL_DAYS = 22; // شهر الموظفين 22 يوم عمل 
 
 const EmployeeAttendance = () => {
   const { user } = useAuth();

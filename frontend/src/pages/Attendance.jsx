@@ -31,7 +31,7 @@ const Attendance = () => {
   const [branches, setBranches] = useState([]);
   const [filterBranch, setFilterBranch] = useState("");
   const [search, setSearch] = useState("");
-  const [sortMode, setSortMode] = useState("name"); // name | added
+  const [sortMode, setSortMode] = useState("name");
 
   const [students, setStudents] = useState([]);
 
@@ -44,13 +44,26 @@ const Attendance = () => {
   // تبويب الملخص الشهري
   const [month, setMonth] = useState(activeMonth);
   const [year, setYear] = useState(activeYear);
-  const [summary, setSummary] = useState({}); // studentId -> { presentDays, absentDays }
+  const [summary, setSummary] = useState({});
   const [savingSummary, setSavingSummary] = useState(false);
   const [summaryMessage, setSummaryMessage] = useState("");
   const [monthTouched, setMonthTouched] = useState(false);
 
-  // لو المستخدم غيّر الشهر المعتمد من الأيقونة العلوية ولسه ما لمسش
-  // الفورم بإيده، يتحدّث الشهر/السنة هنا تلقائيًا
+  // 🔄 دالة مساعدة لإعادة جلب الملخص الشهري
+  const fetchMonthlySummary = async () => {
+    const params = { department, month, year };
+    if (filterBranch) params.branch = filterBranch;
+    const res = await api.get("/monthly-attendance", { params });
+    const map = {};
+    res.data.forEach((r) => {
+      if (r.student) {
+        const id = r.student._id || r.student;
+        map[id] = { presentDays: r.presentDays, absentDays: r.absentDays };
+      }
+    });
+    setSummary(map);
+  };
+
   useEffect(() => {
     if (!monthTouched) {
       setMonth(activeMonth);
@@ -58,7 +71,6 @@ const Attendance = () => {
     }
   }, [activeMonth, activeYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // لو المستخدم مقفول على قسم واحد بس، افرضه دايمًا
   useEffect(() => {
     if (deptAccess.locked && department !== deptAccess.department) {
       setDepartment(deptAccess.department);
@@ -92,16 +104,8 @@ const Attendance = () => {
 
   useEffect(() => {
     if (tab !== "monthly") return;
-    const params = { department, month, year };
-    if (filterBranch) params.branch = filterBranch;
-    api.get("/monthly-attendance", { params }).then((res) => {
-      const map = {};
-      res.data.forEach((r) => {
-        if (r.student) map[r.student._id || r.student] = { presentDays: r.presentDays, absentDays: r.absentDays };
-      });
-      setSummary(map);
-    });
-  }, [department, month, year, students.length, tab, filterBranch]);
+    fetchMonthlySummary();
+  }, [department, month, year, students.length, tab, filterBranch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setStatus = (studentId, status) => {
     setRecords((prev) => ({ ...prev, [studentId]: status }));
@@ -111,15 +115,33 @@ const Attendance = () => {
     setSaving(true);
     setMessage("");
     try {
-      const payload = students.map((s) => ({
+      const touched = students.filter((s) => records[s._id]);
+      const untouched = students.filter((s) => !records[s._id]);
+
+      if (touched.length === 0) {
+        setMessage("⚠️ لسه ما سجّلتش حالة أي طالب. دوس على الحالة المناسبة لكل طالب الأول.");
+        setSaving(false);
+        return;
+      }
+
+      const payload = touched.map((s) => ({
         student: s._id,
         branch: s.branch?._id || s.branch,
         department,
         date,
-        status: records[s._id] || "present",
+        status: records[s._id],
       }));
       await api.post("/attendance/bulk", { records: payload });
-      setMessage("تم حفظ الحضور بنجاح ");
+
+      if (untouched.length > 0) {
+        setMessage(
+          `تم حفظ حضور ${touched.length} طالب ✅ — تنبيه: ${untouched.length} طالب لسه ما اتسجلش حضورهم: ${untouched
+            .map((s) => s.name)
+            .join("، ")}`
+        );
+      } else {
+        setMessage("تم حفظ الحضور بنجاح ✅");
+      }
     } catch (err) {
       setMessage(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
     } finally {
@@ -127,7 +149,6 @@ const Attendance = () => {
     }
   };
 
-  // تعديل الحضور أو الغياب بيحسب التاني تلقائي (المجموع = 20 يوم)
   const setSummaryField = (studentId, field, value) => {
     let num = value === "" ? "" : Math.max(0, Math.min(MONTH_TOTAL_DAYS, Number(value)));
     setSummary((prev) => {
@@ -137,14 +158,38 @@ const Attendance = () => {
     });
   };
 
+  // ============================================================
+  // حفظ الملخص الشهري:
+  // - بيحفظ بس الطلاب اللي المستخدم لمسهم
+  // - بعد الحفظ بيعمل fetch تاني عشان الصفحة تتحدّث فورًا
+  // ============================================================
   const handleSaveSummary = async () => {
     setSavingSummary(true);
     setSummaryMessage("");
     try {
-      const payload = students.map((s) => {
-        const rec = summary[s._id] || {};
-        const present = rec.presentDays === "" || rec.presentDays == null ? 0 : rec.presentDays;
-        const absent = rec.absentDays === "" || rec.absentDays == null ? MONTH_TOTAL_DAYS - present : rec.absentDays;
+      const touched = students.filter((s) => {
+        const rec = summary[s._id];
+        return rec && rec.presentDays !== "" && rec.presentDays != null;
+      });
+
+      const untouched = students.filter((s) => {
+        const rec = summary[s._id];
+        return !rec || rec.presentDays === "" || rec.presentDays == null;
+      });
+
+      if (touched.length === 0) {
+        setSummaryMessage("⚠️ لسه ما سجّلتش حضور أي طالب. عدّل أيام الحضور/الغياب الأول.");
+        setSavingSummary(false);
+        return;
+      }
+
+      const payload = touched.map((s) => {
+        const rec = summary[s._id];
+        const present = Number(rec.presentDays) || 0;
+        const absent =
+          rec.absentDays === "" || rec.absentDays == null
+            ? MONTH_TOTAL_DAYS - present
+            : Number(rec.absentDays);
         return {
           student: s._id,
           branch: s.branch?._id || s.branch,
@@ -155,8 +200,21 @@ const Attendance = () => {
           absentDays: absent,
         };
       });
+
       await api.post("/monthly-attendance/bulk", { records: payload });
-      setSummaryMessage("تم حفظ ملخص الحضور الشهري بنجاح ");
+
+      // 🔄 إعادة جلب البيانات بعد الحفظ
+      await fetchMonthlySummary();
+
+      if (untouched.length > 0) {
+        setSummaryMessage(
+          `تم حفظ ${touched.length} طالب ✅ — تنبيه: ${untouched.length} طالب لسه ما اتسجلش حضورهم: ${untouched
+            .map((s) => s.name)
+            .join("، ")}`
+        );
+      } else {
+        setSummaryMessage("تم حفظ ملخص الحضور الشهري بنجاح ✅");
+      }
     } catch (err) {
       setSummaryMessage(err.response?.data?.message || "حدث خطأ أثناء الحفظ");
     } finally {
@@ -245,7 +303,17 @@ const Attendance = () => {
 
       {tab === "daily" && (
         <>
-          {message && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{message}</div>}
+          {message && (
+            <div
+              className={`text-sm rounded-xl px-3 py-2 mb-4 ${
+                message.startsWith("⚠️") || message.includes("تنبيه")
+                  ? "bg-amber-50 text-amber-700"
+                  : "bg-primary-50 text-primary-700"
+              }`}
+            >
+              {message}
+            </div>
+          )}
           <div className="card overflow-x-auto">
             <table className="data-table">
               <thead>
@@ -257,18 +325,18 @@ const Attendance = () => {
               </thead>
               <tbody>
                 {filteredStudents.map((s) => (
-                  <tr key={s._id}>
+                  <tr key={s._id} className={!records[s._id] ? "bg-amber-50/40" : ""}>
                     <td className="font-semibold">{s.name}</td>
                     <td>{s.teacher?.name || "—"}</td>
                     <td>
-                      <div className="flex gap-1 flex-wrap">
+                      <div className="flex gap-1 flex-wrap items-center">
                         {Object.entries(STATUS_LABELS).map(([key, label]) => (
                           <button
                             key={key}
                             type="button"
                             onClick={() => setStatus(s._id, key)}
                             className={`badge cursor-pointer border ${
-                              (records[s._id] || "present") === key
+                              records[s._id] === key
                                 ? STATUS_COLORS[key] + " border-transparent"
                                 : "bg-white text-sand-400 border-sand-200"
                             }`}
@@ -276,6 +344,9 @@ const Attendance = () => {
                             {label}
                           </button>
                         ))}
+                        {!records[s._id] && (
+                          <span className="text-xs text-amber-600 font-semibold">⚠️ لم يُسجَّل بعد</span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -298,9 +369,19 @@ const Attendance = () => {
       {tab === "monthly" && (
         <>
           <p className="text-xs text-sand-400 mb-3">
-            الشهر معتمد كـ 22 يوم عمل. سجّل أيام الحضور أو الغياب وهيتحسبلك التاني تلقائي (المجموع دايمًا 22).
+            الشهر معتمد كـ 22 يوم عمل. .
           </p>
-          {summaryMessage && <div className="bg-primary-50 text-primary-700 text-sm rounded-xl px-3 py-2 mb-4">{summaryMessage}</div>}
+          {summaryMessage && (
+            <div
+              className={`text-sm rounded-xl px-3 py-2 mb-4 ${
+                summaryMessage.startsWith("⚠️") || summaryMessage.includes("تنبيه")
+                  ? "bg-amber-50 text-amber-700"
+                  : "bg-primary-50 text-primary-700"
+              }`}
+            >
+              {summaryMessage}
+            </div>
+          )}
           <div className="card overflow-x-auto">
             <table className="data-table">
               <thead>
@@ -313,9 +394,15 @@ const Attendance = () => {
               <tbody>
                 {filteredStudents.map((s) => {
                   const rec = summary[s._id] || {};
+                  const notTouched = rec.presentDays === "" || rec.presentDays == null;
                   return (
-                    <tr key={s._id}>
-                      <td className="font-semibold">{s.name}</td>
+                    <tr key={s._id} className={notTouched ? "bg-amber-50/40" : ""}>
+                      <td className="font-semibold">
+                        {s.name}
+                        {notTouched && (
+                          <span className="text-xs text-amber-600 font-semibold mr-2">⚠️ لم يُسجَّل</span>
+                        )}
+                      </td>
                       <td>
                         <input
                           type="number"
