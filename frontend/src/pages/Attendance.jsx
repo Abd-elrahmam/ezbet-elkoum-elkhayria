@@ -27,7 +27,9 @@ const Attendance = () => {
   const deptAccess = useDepartmentAccess();
 
   const [tab, setTab] = useState("daily"); // daily | monthly
-  const [department, setDepartment] = useState(deptAccess.department || "nursery");
+  const [department, setDepartment] = useState(
+    deptAccess.department || "nursery",
+  );
   const [branches, setBranches] = useState([]);
   const [filterBranch, setFilterBranch] = useState("");
   const [search, setSearch] = useState("");
@@ -119,7 +121,9 @@ const Attendance = () => {
       const untouched = students.filter((s) => !records[s._id]);
 
       if (touched.length === 0) {
-        setMessage("⚠️ لسه ما سجّلتش حالة أي طالب. دوس على الحالة المناسبة لكل طالب الأول.");
+        setMessage(
+          "⚠️ لسه ما سجّلتش حالة أي طالب. دوس على الحالة المناسبة لكل طالب الأول.",
+        );
         setSaving(false);
         return;
       }
@@ -134,10 +138,9 @@ const Attendance = () => {
       await api.post("/attendance/bulk", { records: payload });
 
       if (untouched.length > 0) {
+        const studentWord = untouched.length === 1 ? "طالب" : "طلاب";
         setMessage(
-          `تم حفظ حضور ${touched.length} طالب ✅ — تنبيه: ${untouched.length} طالب لسه ما اتسجلش حضورهم: ${untouched
-            .map((s) => s.name)
-            .join("، ")}`
+          `تم حفظ حضور ${touched.length} طالب بنجاح ✅ — تنبيه: لم يُسجَّل حضور ${untouched.length} ${studentWord} بعد`,
         );
       } else {
         setMessage("تم حفظ الحضور بنجاح ✅");
@@ -150,11 +153,17 @@ const Attendance = () => {
   };
 
   const setSummaryField = (studentId, field, value) => {
-    let num = value === "" ? "" : Math.max(0, Math.min(MONTH_TOTAL_DAYS, Number(value)));
+    let num =
+      value === ""
+        ? ""
+        : Math.max(0, Math.min(MONTH_TOTAL_DAYS, Number(value)));
     setSummary((prev) => {
       const other = field === "presentDays" ? "absentDays" : "presentDays";
       const otherVal = num === "" ? "" : MONTH_TOTAL_DAYS - num;
-      return { ...prev, [studentId]: { ...prev[studentId], [field]: num, [other]: otherVal } };
+      return {
+        ...prev,
+        [studentId]: { ...prev[studentId], [field]: num, [other]: otherVal },
+      };
     });
   };
 
@@ -178,7 +187,9 @@ const Attendance = () => {
       });
 
       if (touched.length === 0) {
-        setSummaryMessage("⚠️ لسه ما سجّلتش حضور أي طالب. عدّل أيام الحضور/الغياب الأول.");
+        setSummaryMessage(
+          "⚠️ لسه ما سجّلتش حضور أي طالب. عدّل أيام الحضور/الغياب الأول.",
+        );
         setSavingSummary(false);
         return;
       }
@@ -210,7 +221,7 @@ const Attendance = () => {
         setSummaryMessage(
           `تم حفظ ${touched.length} طالب ✅ — تنبيه: ${untouched.length} طالب لسه ما اتسجلش حضورهم: ${untouched
             .map((s) => s.name)
-            .join("، ")}`
+            .join("، ")}`,
         );
       } else {
         setSummaryMessage("تم حفظ ملخص الحضور الشهري بنجاح ✅");
@@ -223,8 +234,11 @@ const Attendance = () => {
   };
 
   const filteredStudents = useMemo(
-    () => students.filter((s) => s.name.toLowerCase().includes(search.toLowerCase())),
-    [students, search]
+    () =>
+      students.filter((s) =>
+        s.name.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [students, search],
   );
 
   return (
@@ -253,49 +267,83 @@ const Attendance = () => {
             {department === "quran" ? "📖 الكتاب" : "🧸 الحضانة"}
           </span>
         ) : (
-          <select className="input max-w-[160px]" value={department} onChange={(e) => setDepartment(e.target.value)}>
+          <select
+            className="input max-w-[160px]"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+          >
             <option value="quran">الكتاب</option>
             <option value="nursery">الحضانة</option>
           </select>
         )}
 
         {user.role === "super_admin" && (
-          <select className="input max-w-[200px]" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
+          <select
+            className="input max-w-[200px]"
+            value={filterBranch}
+            onChange={(e) => setFilterBranch(e.target.value)}
+          >
             <option value="">كل الفروع</option>
             {branches.map((b) => (
-              <option key={b._id} value={b._id}>{b.name}</option>
+              <option key={b._id} value={b._id}>
+                {b.name}
+              </option>
             ))}
           </select>
         )}
 
-        <input className="input max-w-xs" placeholder="بحث بالاسم..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input
+          className="input max-w-xs"
+          placeholder="بحث بالاسم..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
-        <select className="input max-w-[190px]" value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
+        <select
+          className="input max-w-[190px]"
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value)}
+        >
           <option value="name">ترتيب أبجدي</option>
           <option value="added">ترتيب الإضافة</option>
         </select>
 
         {tab === "daily" ? (
-          <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input
+            type="date"
+            className="input"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         ) : (
           <div className="flex gap-2 items-center">
             <select
               className="input"
               value={month}
-              onChange={(e) => { setMonth(Number(e.target.value)); setMonthTouched(true); }}
+              onChange={(e) => {
+                setMonth(Number(e.target.value));
+                setMonthTouched(true);
+              }}
             >
               {MONTH_NAMES.map((m, i) => (
-                <option key={i + 1} value={i + 1}>{m}</option>
+                <option key={i + 1} value={i + 1}>
+                  {m}
+                </option>
               ))}
             </select>
             <input
               type="number"
               className="input w-24"
               value={year}
-              onChange={(e) => { setYear(Number(e.target.value)); setMonthTouched(true); }}
+              onChange={(e) => {
+                setYear(Number(e.target.value));
+                setMonthTouched(true);
+              }}
             />
             {isCustom && !monthTouched && (
-              <span className="text-xs text-primary-700 bg-primary-50 rounded-full px-2 py-1">مأخوذ من الشهر المحدد أعلى الصفحة</span>
+              <span className="text-xs text-primary-700 bg-primary-50 rounded-full px-2 py-1">
+                مأخوذ من الشهر المحدد أعلى الصفحة
+              </span>
             )}
           </div>
         )}
@@ -325,7 +373,10 @@ const Attendance = () => {
               </thead>
               <tbody>
                 {filteredStudents.map((s) => (
-                  <tr key={s._id} className={!records[s._id] ? "bg-amber-50/40" : ""}>
+                  <tr
+                    key={s._id}
+                    className={!records[s._id] ? "bg-amber-50/40" : ""}
+                  >
                     <td className="font-semibold">{s.name}</td>
                     <td>{s.teacher?.name || "—"}</td>
                     <td>
@@ -345,21 +396,31 @@ const Attendance = () => {
                           </button>
                         ))}
                         {!records[s._id] && (
-                          <span className="text-xs text-amber-600 font-semibold">⚠️ لم يُسجَّل بعد</span>
+                          <span className="text-xs text-amber-600 font-semibold">
+                            ⚠️ لم يُسجَّل بعد
+                          </span>
                         )}
                       </div>
                     </td>
                   </tr>
                 ))}
                 {filteredStudents.length === 0 && (
-                  <tr><td colSpan={3} className="text-center text-sand-400 py-8">لا يوجد طلاب مطابقين</td></tr>
+                  <tr>
+                    <td colSpan={3} className="text-center text-sand-400 py-8">
+                      لا يوجد طلاب مطابقين
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
 
           {filteredStudents.length > 0 && (
-            <button className="btn-primary mt-4" onClick={handleSaveAll} disabled={saving}>
+            <button
+              className="btn-primary mt-4"
+              onClick={handleSaveAll}
+              disabled={saving}
+            >
               {saving ? "جارِ الحفظ..." : "حفظ الحضور"}
             </button>
           )}
@@ -374,7 +435,8 @@ const Attendance = () => {
           {summaryMessage && (
             <div
               className={`text-sm rounded-xl px-3 py-2 mb-4 ${
-                summaryMessage.startsWith("⚠️") || summaryMessage.includes("تنبيه")
+                summaryMessage.startsWith("⚠️") ||
+                summaryMessage.includes("تنبيه")
                   ? "bg-amber-50 text-amber-700"
                   : "bg-primary-50 text-primary-700"
               }`}
@@ -394,13 +456,19 @@ const Attendance = () => {
               <tbody>
                 {filteredStudents.map((s) => {
                   const rec = summary[s._id] || {};
-                  const notTouched = rec.presentDays === "" || rec.presentDays == null;
+                  const notTouched =
+                    rec.presentDays === "" || rec.presentDays == null;
                   return (
-                    <tr key={s._id} className={notTouched ? "bg-amber-50/40" : ""}>
+                    <tr
+                      key={s._id}
+                      className={notTouched ? "bg-amber-50/40" : ""}
+                    >
                       <td className="font-semibold">
                         {s.name}
                         {notTouched && (
-                          <span className="text-xs text-amber-600 font-semibold mr-2">⚠️ لم يُسجَّل</span>
+                          <span className="text-xs text-amber-600 font-semibold mr-2">
+                            ⚠️ لم يُسجَّل
+                          </span>
                         )}
                       </td>
                       <td>
@@ -410,7 +478,13 @@ const Attendance = () => {
                           max={MONTH_TOTAL_DAYS}
                           className="input w-24"
                           value={rec.presentDays ?? ""}
-                          onChange={(e) => setSummaryField(s._id, "presentDays", e.target.value)}
+                          onChange={(e) =>
+                            setSummaryField(
+                              s._id,
+                              "presentDays",
+                              e.target.value,
+                            )
+                          }
                         />
                       </td>
                       <td>
@@ -420,21 +494,31 @@ const Attendance = () => {
                           max={MONTH_TOTAL_DAYS}
                           className="input w-24"
                           value={rec.absentDays ?? ""}
-                          onChange={(e) => setSummaryField(s._id, "absentDays", e.target.value)}
+                          onChange={(e) =>
+                            setSummaryField(s._id, "absentDays", e.target.value)
+                          }
                         />
                       </td>
                     </tr>
                   );
                 })}
                 {filteredStudents.length === 0 && (
-                  <tr><td colSpan={3} className="text-center text-sand-400 py-8">لا يوجد طلاب مطابقين</td></tr>
+                  <tr>
+                    <td colSpan={3} className="text-center text-sand-400 py-8">
+                      لا يوجد طلاب مطابقين
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
 
           {filteredStudents.length > 0 && (
-            <button className="btn-primary mt-4" onClick={handleSaveSummary} disabled={savingSummary}>
+            <button
+              className="btn-primary mt-4"
+              onClick={handleSaveSummary}
+              disabled={savingSummary}
+            >
               {savingSummary ? "جارِ الحفظ..." : "حفظ الملخص الشهري"}
             </button>
           )}
