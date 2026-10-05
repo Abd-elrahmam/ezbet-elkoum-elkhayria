@@ -140,7 +140,7 @@ const SiteSettings = () => {
         <h2 className="font-bold text-sand-800">النصوص ورقم التواصل</h2>
         <div>
           <label className="label">
-            اسم الجمعية (يظهر في الهيدر والصفحة الرئيسية)
+            اسم المؤسسة (يظهر في الهيدر والصفحة الرئيسية)
           </label>
           <input
             className="input"
@@ -157,7 +157,7 @@ const SiteSettings = () => {
           />
         </div>
         <div>
-          <label className="label">نبذة عن الجمعية (الصفحة الرئيسية)</label>
+          <label className="label">نبذة عن المؤسسة(الصفحة الرئيسية)</label>
           <textarea
             className="input"
             rows={3}
@@ -167,7 +167,7 @@ const SiteSettings = () => {
         </div>
         <div>
           <label className="label">
-            رقم واتساب تواصل الجمعية (بصيغة دولية بدون +، مثال: 201021330018)
+            رقم واتساب تواصل المؤسسة(بصيغة دولية بدون +، مثال: 201021330018)
           </label>
           <input
             className="input"

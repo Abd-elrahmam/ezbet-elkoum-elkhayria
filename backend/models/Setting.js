@@ -9,11 +9,12 @@ const settingSchema = new mongoose.Schema(
     heroSubtitle: { type: String, default: "نظام إدارة الحضانة والكتاب" },
     aboutText: {
       type: String,
-      default: "جمعية خيرية تُعنى بتحفيظ القرآن الكريم ورعاية الأطفال، تضم فروعًا متعددة تخدم أبناء المنطقة.",
+      default:
+        "جمعية خيرية تُعنى بتحفيظ القرآن الكريم ورعاية الأطفال، تضم فروعًا متعددة تخدم أبناء المنطقة.",
     },
-    whatsappNumber: { type: String, default: "201021330018" }, // رقم تواصل الجمعية - قابل للتعديل من الأدمن
+    whatsappNumber: { type: String, default: "201021330018" }, // رقم تواصل المؤسسة- قابل للتعديل من الأدمن
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Setting", settingSchema);

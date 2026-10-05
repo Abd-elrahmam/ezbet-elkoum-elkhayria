@@ -70,13 +70,16 @@ const memRange = (r) => {
 };
 
 const revRange = (r) => {
+  const times1 = r.revTimes1 && r.revTimes1 > 1 ? ` (×${r.revTimes1})` : "";
+  const times2 = r.revTimes2 && r.revTimes2 > 1 ? ` (×${r.revTimes2})` : "";
+
   const p1 =
     !r.revFromSurah && !r.revToSurah
       ? null
-      : `${r.hasRevPeriod2 ? `${r.revPeriod1Label || "الفترة الأولى"}: ` : ""}من سورة ${r.revFromSurah || "—"} إلى سورة ${r.revToSurah || "—"}`;
+      : `${r.hasRevPeriod2 ? `${r.revPeriod1Label || "الفترة الأولى"}: ` : ""}من سورة ${r.revFromSurah || "—"} إلى سورة ${r.revToSurah || "—"}${times1}`;
   const p2 =
     r.hasRevPeriod2 && (r.revFromSurah2 || r.revToSurah2)
-      ? `${r.revPeriod2Label || "الفترة الثانية"}: من سورة ${r.revFromSurah2 || "—"} إلى سورة ${r.revToSurah2 || "—"}`
+      ? `${r.revPeriod2Label || "الفترة الثانية"}: من سورة ${r.revFromSurah2 || "—"} إلى سورة ${r.revToSurah2 || "—"}${times2}`
       : null;
   if (!p1 && !p2) return null;
   return [p1, p2].filter(Boolean).join(" | ");
@@ -124,6 +127,45 @@ const buildWhatsAppMessage = (report, monthText) => {
     lines.push(
       `المراجعة: ${formatPagesOrJuz(report.hifz.totalRevisionPages)}${report.hifz.expectedRevisionPages > 0 ? ` من ${formatPagesOrJuz(report.hifz.expectedRevisionPages)}` : ""}`,
     );
+
+    // 🔁 عدد مرات التكرار
+    const hasMemTimes =
+      report.hifz.memTimes1 > 1 ||
+      (report.hifz.hasPeriod2 && report.hifz.memTimes2 > 1);
+    const hasRevTimes =
+      report.hifz.revTimes1 > 1 ||
+      (report.hifz.hasRevPeriod2 && report.hifz.revTimes2 > 1);
+
+    if (hasMemTimes) {
+      const parts = [];
+      if (report.hifz.memTimes1 > 1) {
+        parts.push(
+          report.hifz.hasPeriod2
+            ? `ف1: ${report.hifz.memTimes1}`
+            : `${report.hifz.memTimes1}`,
+        );
+      }
+      if (report.hifz.hasPeriod2 && report.hifz.memTimes2 > 1) {
+        parts.push(`ف2: ${report.hifz.memTimes2}`);
+      }
+      lines.push(`🔁 عدد مرات الحفظ: ${parts.join(" | ")}`);
+    }
+
+    if (hasRevTimes) {
+      const parts = [];
+      if (report.hifz.revTimes1 > 1) {
+        parts.push(
+          report.hifz.hasRevPeriod2
+            ? `ف1: ${report.hifz.revTimes1}`
+            : `${report.hifz.revTimes1}`,
+        );
+      }
+      if (report.hifz.hasRevPeriod2 && report.hifz.revTimes2 > 1) {
+        parts.push(`ف2: ${report.hifz.revTimes2}`);
+      }
+      lines.push(`🔁 عدد مرات المراجعة: ${parts.join(" | ")}`);
+    }
+
     if (report.hifz.grade)
       lines.push(`تقييم الحفظ: ${GRADE_LABELS_AR[report.hifz.grade]}`);
     if (report.hifz.revGrade)
@@ -1016,6 +1058,53 @@ const Reports = () => {
                               </span>
                             </p>
                           )}
+
+                          {/* 🔁 عدد مرات التكرار */}
+                          {(report.hifz.memTimes1 > 1 ||
+                            (report.hifz.hasPeriod2 &&
+                              report.hifz.memTimes2 > 1) ||
+                            report.hifz.revTimes1 > 1 ||
+                            (report.hifz.hasRevPeriod2 &&
+                              report.hifz.revTimes2 > 1)) && (
+                            <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-sm">
+                              <p className="text-xs text-amber-700 mb-1 font-semibold">
+                                 عدد مرات التكرار
+                              </p>
+                              <div className="flex flex-wrap gap-3 text-amber-800">
+                                {report.hifz.memTimes1 > 1 && (
+                                  <span>
+                                    الحفظ{" "}
+                                    {report.hifz.hasPeriod2 ? "(ف1)" : ""}:{" "}
+                                    <strong>{report.hifz.memTimes1}</strong> مرة
+                                  </span>
+                                )}
+                                {report.hifz.hasPeriod2 &&
+                                  report.hifz.memTimes2 > 1 && (
+                                    <span>
+                                      الحفظ (ف2):{" "}
+                                      <strong>{report.hifz.memTimes2}</strong>{" "}
+                                      مرة
+                                    </span>
+                                  )}
+                                {report.hifz.revTimes1 > 1 && (
+                                  <span>
+                                    المراجعة{" "}
+                                    {report.hifz.hasRevPeriod2 ? "(ف1)" : ""}:{" "}
+                                    <strong>{report.hifz.revTimes1}</strong> مرة
+                                  </span>
+                                )}
+                                {report.hifz.hasRevPeriod2 &&
+                                  report.hifz.revTimes2 > 1 && (
+                                    <span>
+                                      المراجعة (ف2):{" "}
+                                      <strong>{report.hifz.revTimes2}</strong>{" "}
+                                      مرة
+                                    </span>
+                                  )}
+                              </div>
+                            </div>
+                          )}
+
                           {(report.hifz.mutoonFrom || report.hifz.mutoonTo) && (
                             <p>
                               <span className="text-sand-500">المتون: </span>
@@ -1476,27 +1565,64 @@ const AnnualReportBody = ({ report }) => {
               "حاضر",
               "غائب",
               "الحفظ الجديد",
+              "عدد مرات الحفظ",
               "المراجعة",
+              "عدد مرات المراجعة",
               "تقييم الحفظ",
               "تقييم المراجعة",
               "متوسط التقييم",
             ]}
-            rows={months.map((d) => [
-              monthLabel(d.month),
-              d.attendance.present,
-              d.attendance.absent,
-              d.hifz
-                ? `${formatPagesOrJuz(d.hifz.totalMemPages)}${d.hifz.expectedPages > 0 ? ` من ${formatPagesOrJuz(d.hifz.expectedPages)}` : ""}`
-                : "—",
-              d.hifz
-                ? `${formatPagesOrJuz(d.hifz.totalRevisionPages)}${d.hifz.expectedRevisionPages > 0 ? ` من ${formatPagesOrJuz(d.hifz.expectedRevisionPages)}` : ""}`
-                : "—",
-              d.hifz?.grade ? GRADE_LABELS[d.hifz.grade] : "—",
-              d.hifz?.revGrade ? GRADE_LABELS[d.hifz.revGrade] : "—",
-              d.evaluations.length
-                ? `${(d.evaluations.reduce((s, e) => s + e.rating, 0) / d.evaluations.length).toFixed(1)}/5`
-                : "—",
-            ])}
+            rows={months.map((d) => {
+              const memT1 = d.hifz?.memTimes1 || 0;
+              const memT2 = d.hifz?.hasPeriod2 ? d.hifz?.memTimes2 || 0 : 0;
+              const revT1 = d.hifz?.revTimes1 || 0;
+              const revT2 = d.hifz?.hasRevPeriod2 ? d.hifz?.revTimes2 || 0 : 0;
+
+              const memTimesText = d.hifz
+                ? [
+                    memT1 > 1
+                      ? d.hifz.hasPeriod2
+                        ? `ف1: ${memT1}`
+                        : `${memT1}`
+                      : null,
+                    memT2 > 1 ? `ف2: ${memT2}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" | ") || "1"
+                : "—";
+
+              const revTimesText = d.hifz
+                ? [
+                    revT1 > 1
+                      ? d.hifz.hasRevPeriod2
+                        ? `ف1: ${revT1}`
+                        : `${revT1}`
+                      : null,
+                    revT2 > 1 ? `ف2: ${revT2}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" | ") || "1"
+                : "—";
+
+              return [
+                monthLabel(d.month),
+                d.attendance.present,
+                d.attendance.absent,
+                d.hifz
+                  ? `${formatPagesOrJuz(d.hifz.totalMemPages)}${d.hifz.expectedPages > 0 ? ` من ${formatPagesOrJuz(d.hifz.expectedPages)}` : ""}`
+                  : "—",
+                memTimesText,
+                d.hifz
+                  ? `${formatPagesOrJuz(d.hifz.totalRevisionPages)}${d.hifz.expectedRevisionPages > 0 ? ` من ${formatPagesOrJuz(d.hifz.expectedRevisionPages)}` : ""}`
+                  : "—",
+                revTimesText,
+                d.hifz?.grade ? GRADE_LABELS[d.hifz.grade] : "—",
+                d.hifz?.revGrade ? GRADE_LABELS[d.hifz.revGrade] : "—",
+                d.evaluations.length
+                  ? `${(d.evaluations.reduce((s, e) => s + e.rating, 0) / d.evaluations.length).toFixed(1)}/5`
+                  : "—",
+              ];
+            })}
           />
         </ReportSection>
       </>
